@@ -145,6 +145,7 @@ class CachePlanner(sparkMaster: String, hdfsMaster: String) {
   //If found, it submits a separate thread to cache the dataset
   //It launches a separate thread (PoolSubmissionThread) for each queue that is responsible for submitting queries to spark
   //Within the PoolSubmissionThread, it launches a separate thread for each query submission
+  //The algorithm uses a simple heuristic to decide whether to cache a dataset. It finds the dataset that is read by the most number of jobs > minSharedJobs
   def startCacheSingle() {
     println("Starting Planner with single caching, batch periodicity:"+batchPeriodicity+", max queries per queue in batch:"+maxQueriesPerQueueinBatch)
     val poolNameToQueries  = new HashMap[String, ArrayBuffer[Query]]
@@ -506,7 +507,7 @@ class CachePlanner(sparkMaster: String, hdfsMaster: String) {
 /**
  * An internal representation of a pool (Queue. It contains an ArrayBuffer of TaskSets and also weight
  */
-class Pool(val name: String)
+class Pool(val name: String) extends Serializable
 {
   var queryQueue = new ArrayBuffer[Query]
 }
