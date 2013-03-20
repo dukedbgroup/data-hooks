@@ -6,6 +6,7 @@ import SparkContext._
 import java.io._
 
 import scala.collection.mutable.HashMap
+import scala.collection.mutable.ArrayBuffer
 
 import edu.duke.dbmsplus.planner._
 import edu.duke.dbmsplus.planner.QueryOperation._
@@ -27,7 +28,8 @@ object SparkQueriesPlannerDriver {
     var queriesPerQueue:Int = -1
     var minSharedJobs:Int = 3
     var loadFile: String = ""
-    var saveFile: String = ""  
+    var saveFile: String = ""
+    var numQueues: Int = 4
     while (i < args.length) {
       if(args(i) == "-s") {
         sparkAddress = args(i+1)
@@ -46,6 +48,9 @@ object SparkQueriesPlannerDriver {
         i = i+1
       } else if (args(i) == "-j") {
         minSharedJobs = args(i+1).toInt
+        i = i+1
+      } else if (args(i) == "-num_queues") {
+        numQueues = args(i+1).toInt
         i = i+1
       } else if (args(i) == "-load") {
         loadFile = args(i+1)
@@ -67,7 +72,11 @@ object SparkQueriesPlannerDriver {
       cachePlanner.minSharedjobs = minSharedJobs
       
       if(loadFile == "") {
-        cachePlanner.initialize("pool1", "pool2", "pool3", "pool4")
+        val poolNames = new ArrayBuffer[String]
+        for(i <- 1 until (numQueues+1))
+          poolNames += ("pool"+i)
+          cachePlanner.initialize(poolNames: _*)
+        //cachePlanner.initialize("pool1", "pool2", "pool3", "pool4")
         prepopulateQueues(cachePlanner)
       } else {
         loadQueriesIntoQueuesFromFile(cachePlanner, loadFile)
@@ -101,7 +110,7 @@ object SparkQueriesPlannerDriver {
   }
   
   //Placeholder for a function that generates queries and put into queues based on some workload properties
-  def generateWorkload() {
+  def generateWorkload(numQueues: Int) {
     
   }
   
@@ -131,6 +140,7 @@ object SparkQueriesPlannerDriver {
     println("-p <periodicity (default 0)>")
     println("-q <queries per queue in batch (default -1) >")
     println("-j <min shared jobs (default 3)>")
+    println("-num_queues <Number of Queues (default 4 (named pooli))>")
     println("-load <path to binary file to load queues>")
     println("-save <path to file to save the queue>")
   }

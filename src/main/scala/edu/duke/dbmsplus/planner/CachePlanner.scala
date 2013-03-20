@@ -13,6 +13,15 @@ import SparkContext._
 import edu.duke.dbmsplus.planner.utils._
 import edu.duke.dbmsplus.planner.QueryOperation._
 
+/**
+ * This is the Query Cache Planner class. The driver interacts with this class
+ * It maintains "external" queues that users submit queries into. 
+ * This class is responsible for looking at the queues and submitting queries to Spark's corresponding internal queues
+ * We currently support 2 strategies: 
+ *    1. The baseline strategy simply grabs the queries in the queue and submits to Spark
+ *    2. The single cache strategy batches the submission process. It periodically grabs at most X number of queries in each queue then decide which dataset to cache
+ *       It submits the dataset caching query and rewrites the queries that read from this dataset to use the cached dataset instead. 
+ */
 class CachePlanner(sparkMaster: String, hdfsMaster: String) {
   //External Queues
   val poolNameToPool = new HashMap[String, Pool]
