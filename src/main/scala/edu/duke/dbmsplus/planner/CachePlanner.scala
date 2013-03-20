@@ -318,17 +318,17 @@ class CachePlanner(sparkMaster: String, hdfsMaster: String) {
         if(query.operation == Sum || query.operation == Min || query.operation == Max) {
           val mapToKV = file.map(line => {
             val splits = line.split(separator)
-            (splits(groupCol),splits(aggCol).toLong) }
+            (splits(groupCol),splits(aggCol).toDouble) }
           )
           if(query.operation == Sum) {
             val reduceByKey = mapToKV.reduceByKey(_ + _, query.parallelism)
-            sc.runJob(reduceByKey, (iter: Iterator[(String,Long)]) => {})
+            sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
           } else if(query.operation == Max) {
             val reduceByKey = mapToKV.reduceByKey((a,b) => {max(a,b)},query.parallelism)
-            sc.runJob(reduceByKey, (iter: Iterator[(String,Long)]) => {})
+            sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
           } else if(query.operation == Min) {
             val reduceByKey = mapToKV.reduceByKey((a,b) => {min(a,b)},query.parallelism)
-            sc.runJob(reduceByKey, (iter: Iterator[(String,Long)]) => {})
+            sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
           }
         } else {
           val mapToKV = file.map(line => {
@@ -362,18 +362,18 @@ class CachePlanner(sparkMaster: String, hdfsMaster: String) {
         val aggCol = query.aggCol
         val mapToKV = rdd.map(line => {
           val splits = line.split(separator)
-          (splits(groupCol),splits(aggCol).toLong) }
+          (splits(groupCol),splits(aggCol).toDouble) }
         )
         if(query.operation == Sum || query.operation == Min || query.operation == Max) {
           if(query.operation == Sum) {
             val reduceByKey = mapToKV.reduceByKey(_ + _, query.parallelism)
-            sc.runJob(reduceByKey, (iter: Iterator[(String,Long)]) => {})
+            sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
           } else if(query.operation == Max) {
             val reduceByKey = mapToKV.reduceByKey((a,b) => {max(a,b)},query.parallelism)
-            sc.runJob(reduceByKey, (iter: Iterator[(String,Long)]) => {})
+            sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
           } else if(query.operation == Min) {
             val reduceByKey = mapToKV.reduceByKey((a,b) => {min(a,b)},query.parallelism)
-            sc.runJob(reduceByKey, (iter: Iterator[(String,Long)]) => {})
+            sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
           }
         } else {
           val mapToKV = rdd.map(line => {
@@ -415,17 +415,17 @@ class CachePlanner(sparkMaster: String, hdfsMaster: String) {
           if(query.operation == Sum || query.operation == Min || query.operation == Max) {
             val mapToKV = file.map(line => {
               val splits = line.split(separator)
-              (splits(groupCol),splits(aggCol).toLong) }
+              (splits(groupCol),splits(aggCol).toDouble) }
             )
             if(query.operation == Sum) {
               val reduceByKey = mapToKV.reduceByKey(_ + _, query.parallelism)
-              sc.runJob(reduceByKey, (iter: Iterator[(String,Long)]) => {})            
+              sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})            
             } else if(query.operation == Max) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {max(a,b)},query.parallelism)
-              sc.runJob(reduceByKey, (iter: Iterator[(String,Long)]) => {})
+              sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
             } else if(query.operation == Min) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {min(a,b)},query.parallelism)
-              sc.runJob(reduceByKey, (iter: Iterator[(String,Long)]) => {})
+              sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
             } 
           } else {
             val mapToKV = file.map(line => {
@@ -459,17 +459,17 @@ class CachePlanner(sparkMaster: String, hdfsMaster: String) {
           if(query.operation == Sum || query.operation == Min || query.operation == Max) {
             val mapToKV = rdd.map(line => {
               val splits = line.split(separator)
-              (splits(groupCol),splits(aggCol).toLong) }
+              (splits(groupCol),splits(aggCol).toDouble) }
             )
             if(query.operation == Sum) {
               val reduceByKey = mapToKV.reduceByKey(_ + _, query.parallelism)
-              sc.runJob(reduceByKey, (iter: Iterator[(String,Long)]) => {})
+              sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
             } else if(query.operation == Max) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {max(a,b)},query.parallelism)
-              sc.runJob(reduceByKey, (iter: Iterator[(String,Long)]) => {})
+              sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
             } else if(query.operation == Min) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {min(a,b)},query.parallelism)
-              sc.runJob(reduceByKey, (iter: Iterator[(String,Long)]) => {})
+              sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
             }
           } else {
             val mapToKV = rdd.map(line => {

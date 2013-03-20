@@ -7,6 +7,8 @@ import java.io._
 
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ArrayBuffer
+import scala.compat.Platform
+import scala.util.Random
 
 import edu.duke.dbmsplus.planner._
 import edu.duke.dbmsplus.planner.QueryOperation._
@@ -30,6 +32,11 @@ object SparkQueriesPlannerDriver {
     var loadFile: String = ""
     var saveFile: String = ""
     var numQueues: Int = 4
+    var printOutQueues: Boolean = false
+    var generateNumQueries: Int = 40
+    var generateShareProb: Double = .2
+    var generatePeriod: Int = 5
+    var norun: Boolean = false
     while (i < args.length) {
       if(args(i) == "-s") {
         sparkAddress = args(i+1)
@@ -58,8 +65,16 @@ object SparkQueriesPlannerDriver {
       } else if (args(i) == "-save") {
         saveFile = args(i+1)
         i = i+1
-      }
-      
+      } else if (args(i) == "-print") {
+        printOutQueues = true
+      } else if (args(i) == "-generate") {
+        generateNumQueries = args(i+1).toInt
+        generateShareProb = args(i+2).toDouble
+        generatePeriod = args(i+3).toInt
+        i = i + 3
+      } else if (args(i) == "-norun") {
+        norun = true
+      }       
       i = i + 1
     }
     if(sparkAddress == "" || hdfsAddress == "") {
@@ -76,19 +91,22 @@ object SparkQueriesPlannerDriver {
         for(i <- 1 until (numQueues+1))
           poolNames += ("pool"+i)
           cachePlanner.initialize(poolNames: _*)
-        //cachePlanner.initialize("pool1", "pool2", "pool3", "pool4")
-        prepopulateQueues(cachePlanner)
+        //prepopulateQueues(cachePlanner)
+          generateWorkload(cachePlanner, generateNumQueries, generateShareProb, generatePeriod)
       } else {
         loadQueriesIntoQueuesFromFile(cachePlanner, loadFile)
       }
       if(saveFile != "") {
         saveQueuesToFile(cachePlanner, saveFile)
       }
-      //prepopulateQueues2(cachePlanner)
-      if(cacheOption == "nocache")
-        cachePlanner.start(1)
-      else
-        cachePlanner.start(2)
+      if(printOutQueues)
+        printQueues(cachePlanner)
+      
+      if(!norun)  
+        if(cacheOption == "nocache")
+          cachePlanner.start(1)
+        else
+          cachePlanner.start(2)
                    
     }    
   }
@@ -110,8 +128,87 @@ object SparkQueriesPlannerDriver {
   }
   
   //Placeholder for a function that generates queries and put into queues based on some workload properties
-  def generateWorkload(numQueues: Int) {
+  //This will populate each queue with numQueriesPerQueue queries
+  //Assumes that basedatasets are in /tpch/
+  //probShare is the probability that you will have a shared dataset within a period (period > 1)
+  def generateWorkload(cachePlanner: CachePlanner, numQueriesPerQueue: Int, probShare: Double, period: Int) {
+    //randomly picks a dataset, then decide whether there will be sharing
+    val datasets = Array("/tpch/partsupp", "/tpch/orders", "/tpch/lineitem", "/tpch/customer", "/tpch/part", 
+                         "/tpch2/partsupp", "/tpch2/orders", "/tpch2/lineitem", "/tpch2/customer", "/tpch2/part",
+                         "/tpch3/partsupp", "/tpch3/orders", "/tpch3/lineitem", "/tpch3/customer", "/tpch3/part",
+                         "/tpch4/partsupp", "/tpch4/orders", "/tpch4/lineitem", "/tpch4/customer", "/tpch4/part")
+    val random = new Random(Platform.currentTime)
     
+    var index: Int = 0
+    while (index < numQueriesPerQueue) {
+      var currentPeriod = period
+      if(numQueriesPerQueue - index < period)
+        currentPeriod = numQueriesPerQueue - index
+      
+      //The number of queries to assign in the current iteration
+      val numQueries = currentPeriod * cachePlanner.pools.size
+      
+      var jobIndex: Int = 0
+      while(jobIndex < numQueries) {
+        //Randomly pick a dataset
+        val dataset = datasets(random.nextInt(datasets.length))
+        var groupCol:Int = 0
+        var aggCol:Int = 1
+        if(dataset.contains("customer")) {
+          groupCol = 3
+          aggCol = 5
+        } else if (dataset.contains("orders")) {
+          groupCol = 1
+          aggCol = 0
+        } else if (dataset.contains("part") && !dataset.contains("partsupp")) {
+          groupCol = 3
+          aggCol = 7
+        }
+        //Check whether the current dataset will be shared
+        if(random.nextDouble() < probShare) { //sharing
+          //randomly picks the number of jobs to share
+          var numJobs = random.nextInt(numQueries - jobIndex) + 1 //ranges from 1 to (numQueries - jobIndex)          
+          if (numJobs < 2 && numQueries - jobIndex > 1)
+            numJobs = 2
+          for(i <- 0 until numJobs) {
+            cachePlanner.addQueryToPool("pool"+((jobIndex % cachePlanner.pools.size)+1),new Query(dataset,QueryOperation(random.nextInt(QueryOperation.values.size)),groupCol,aggCol,"\\|",10))
+            jobIndex = jobIndex + 1
+          }          
+        } else { //no sharing
+          //randomly pick an operation
+          cachePlanner.addQueryToPool("pool"+((jobIndex % cachePlanner.pools.size)+1),new Query(dataset,QueryOperation(random.nextInt(QueryOperation.values.size)),groupCol,aggCol,"\\|",10))
+          jobIndex = jobIndex + 1
+        }        
+      }      
+      index = index + currentPeriod        
+    }                        
+  }
+  
+  //prints out the contents of the queues
+  def printQueues(cachePlanner: CachePlanner) {
+    val keys = cachePlanner.poolNameToPool.keys.toList.sorted//new ArrayBuffer[String]    
+    
+    for(key <- keys) {
+      printf("%-32s",key)
+    }
+    println
+    var index: Int = 0
+    var exhausted: Int = 0
+    while(exhausted < cachePlanner.pools.size) {
+      exhausted = 0
+      for(key <- keys) {
+        if(index < cachePlanner.poolNameToPool(key).queryQueue.size) {
+          printf("%-32s",cachePlanner.poolNameToPool(key).queryQueue(index).operation+"("+cachePlanner.poolNameToPool(key).queryQueue(index).input+","+cachePlanner.poolNameToPool(key).queryQueue(index).groupCol+","+cachePlanner.poolNameToPool(key).queryQueue(index).aggCol+")")
+           //print(cachePlanner.poolNameToPool(key).queryQueue(index).operation+"("+cachePlanner.poolNameToPool(key).queryQueue(index).input+","+cachePlanner.poolNameToPool(key).queryQueue(index).groupCol+","+cachePlanner.poolNameToPool(key).queryQueue(index).aggCol+")"+"\t")
+        } else {
+          printf("%-32s"," ")
+          //print("\t")
+          exhausted = exhausted + 1
+        }
+      }
+      println
+      index = index + 1
+    }    
   }
   
   //Function that deserializes a file and loads the queries into the queues
@@ -136,13 +233,16 @@ object SparkQueriesPlannerDriver {
   def printHelp() {
     println("SparkQueriesPlannerDriver -s <spark address> -h <hdfs address> [optional parameters]")
     println("optional parameters:")
-    println("-c <nocache (default) | cache>")
-    println("-p <periodicity (default 0)>")
-    println("-q <queries per queue in batch (default -1) >")
-    println("-j <min shared jobs (default 3)>")
-    println("-num_queues <Number of Queues (default 4 (named pooli))>")
-    println("-load <path to binary file to load queues>")
+    println("-c <nocache (default) | cache> - The planner strategy to use")
+    println("-p <periodicity (default 0)> - The periodicity to check the queue")
+    println("-q <queries per queue in batch (default -1) > - The number of queries in each queue to look ahead")
+    println("-j <min shared jobs (default 3)> - number of shared jobs to consider a dataset as cacheable")
+    println("-num_queues <Number of Queues (default 4 (named pooli))> - The number of external queues")
+    println("-load <path to binary file to load queues> ")
     println("-save <path to file to save the queue>")
+    println("-print - prints queue")
+    println("-generate <num queries> <share probability> <period> - Generates a workload (fills the queues) with the given parameter")
+    println("-norun - don't run the workload")
   }
   
 }
