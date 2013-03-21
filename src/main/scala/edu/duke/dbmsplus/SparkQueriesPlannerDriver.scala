@@ -35,7 +35,8 @@ object SparkQueriesPlannerDriver {
     var printOutQueues: Boolean = false
     var generateNumQueries: Int = 40
     var generateShareProb: Double = .2
-    var generatePeriod: Int = 5
+    var generateMaxGap: Int = 5
+    var generateMaxSharedJobs: Int = 5
     var norun: Boolean = false
     while (i < args.length) {
       if(args(i) == "-s") {
@@ -70,8 +71,9 @@ object SparkQueriesPlannerDriver {
       } else if (args(i) == "-generate") {
         generateNumQueries = args(i+1).toInt
         generateShareProb = args(i+2).toDouble
-        generatePeriod = args(i+3).toInt
-        i = i + 3
+        generateMaxGap = args(i+3).toInt
+        generateMaxSharedJobs = args(i+4).toInt
+        i = i + 4
       } else if (args(i) == "-norun") {
         norun = true
       }       
@@ -92,7 +94,8 @@ object SparkQueriesPlannerDriver {
           poolNames += ("pool"+i)
           cachePlanner.initialize(poolNames: _*)
         //prepopulateQueues(cachePlanner)
-          generateWorkload(cachePlanner, generateNumQueries, generateShareProb, generatePeriod)
+          //generateWorkload(cachePlanner, generateNumQueries, generateShareProb, generatePeriod)
+          generateWorkload2(cachePlanner, generateNumQueries, generateShareProb, generateMaxGap, generateMaxSharedJobs)
       } else {
         loadQueriesIntoQueuesFromFile(cachePlanner, loadFile)
       }
@@ -127,16 +130,16 @@ object SparkQueriesPlannerDriver {
     cachePlanner.addQueryToPool("pool4", new Query("/tpch2/partsupp",Sum,0,1,"\\|",10))    
   }
   
-  //Placeholder for a function that generates queries and put into queues based on some workload properties
   //This will populate each queue with numQueriesPerQueue queries
   //Assumes that basedatasets are in /tpch/
   //probShare is the probability that you will have a shared dataset within a period (period > 1)
   def generateWorkload(cachePlanner: CachePlanner, numQueriesPerQueue: Int, probShare: Double, period: Int) {
     //randomly picks a dataset, then decide whether there will be sharing
-    val datasets = Array("/tpch/partsupp", "/tpch/orders", "/tpch/lineitem", "/tpch/customer", "/tpch/part", 
-                         "/tpch2/partsupp", "/tpch2/orders", "/tpch2/lineitem", "/tpch2/customer", "/tpch2/part",
-                         "/tpch3/partsupp", "/tpch3/orders", "/tpch3/lineitem", "/tpch3/customer", "/tpch3/part",
-                         "/tpch4/partsupp", "/tpch4/orders", "/tpch4/lineitem", "/tpch4/customer", "/tpch4/part")
+    val datasets = Array("/tpch/partsupp", "/tpch/orders", "/tpch/customer", "/tpch/part", 
+                         "/tpch2/partsupp", "/tpch2/orders", "/tpch2/customer", "/tpch2/part",
+                         "/tpch3/partsupp", "/tpch3/orders", "/tpch3/customer", "/tpch3/part",
+                         "/tpch4/partsupp", "/tpch4/orders", "/tpch4/customer", "/tpch4/part",
+                         "/tpch5/partsupp", "/tpch5/orders", "/tpch5/customer", "/tpch5/part")
     val random = new Random(Platform.currentTime)
     
     var index: Int = 0
@@ -183,6 +186,105 @@ object SparkQueriesPlannerDriver {
       index = index + currentPeriod        
     }                        
   }
+  
+  def Desc[T : Ordering] = implicitly[Ordering[T]].reverse
+  
+  //Utility object that is used by the workloadGenerator
+  class GeneratorUtilObj(val dataset: String,val proximity: Int, var numJobs: Int, var lastIndex: Int){    
+  } 
+  
+  //This will populate each queue with numQueriesPerQueue queries
+  //Assumes that basedatasets are in /tpch*/
+  //probShare is the probability that you will have a shared dataset
+  //maxGap is the maximum temporal spread between jobs that share the same dataset
+  //maxSharedJobs is the maximum number of jobs that share the same dataset
+  def generateWorkload2(cachePlanner: CachePlanner, numQueriesPerQueue: Int, probShare: Double, maxGap: Int, maxSharedJobs: Int) {
+    //randomly picks a dataset, then decide whether there will be sharing
+    val datasets = Array("/tpch/partsupp", "/tpch/orders", "/tpch/customer", "/tpch/part", 
+                         "/tpch2/partsupp", "/tpch2/orders", "/tpch2/customer", "/tpch2/part",
+                         "/tpch3/partsupp", "/tpch3/orders", "/tpch3/customer", "/tpch3/part",
+                         "/tpch4/partsupp", "/tpch4/orders", "/tpch4/customer", "/tpch4/part",
+                         "/tpch5/partsupp", "/tpch5/orders", "/tpch5/customer", "/tpch5/part")
+    val random = new Random(Platform.currentTime)
+    
+    val outstandingDatasets = new ArrayBuffer[GeneratorUtilObj]
+    
+    for (index <- 0 until numQueriesPerQueue * cachePlanner.pools.size) {
+      val poolsIndex = index % cachePlanner.pools.size //This is to choose which pool
+      val poolIndex = index / cachePlanner.pools.size //This is to choose which element in the pool
+      
+      //First look if there is an outstandingDataset that we can add to the current index
+      //We filter by proximity < lastIndex - poolIndex, sorted by the proximity and then the by the number of jobs left (in dec order)
+      val filteredOutstandingDatasets = outstandingDatasets.filter(a => {a.proximity <= poolIndex - a.lastIndex}).sortBy(m => (m.proximity))
+      if(filteredOutstandingDatasets.size > 0) {
+        val currentDataset = filteredOutstandingDatasets(0) //Get the first one
+        var groupCol:Int = 0
+        var aggCol:Int = 1
+        if(currentDataset.dataset.contains("customer")) {
+          groupCol = 3
+          aggCol = 5
+        } else if (currentDataset.dataset.contains("orders")) {
+          groupCol = 1
+          aggCol = 0
+        } else if (currentDataset.dataset.contains("part") && !currentDataset.dataset.contains("partsupp")) {
+          groupCol = 3
+          aggCol = 7
+        }
+        cachePlanner.addQueryToPool("pool"+(poolsIndex+1),new Query(currentDataset.dataset,QueryOperation(random.nextInt(QueryOperation.values.size)),groupCol,aggCol,"\\|",10))
+       // println("Using outstanding dataset: "+currentDataset.dataset+", with proximity: "+currentDataset.proximity+", numJobs: "+currentDataset.numJobs+", at last Index: "+poolIndex)
+        currentDataset.numJobs = currentDataset.numJobs - 1
+        if(currentDataset.numJobs <= 0) {
+          //remove this from the outstandingDatasets
+          outstandingDatasets -= currentDataset
+        } else {
+          currentDataset.lastIndex = poolIndex
+        }
+        
+      }
+      else { //No outstanding dataset is eligible to be added, so we just pick one
+        val eligibleDatasets = datasets.filter(a => {var retVal:Boolean = true
+                                                     for(item <- outstandingDatasets) {
+                                                       if(item.dataset == a)
+                                                         retVal = false
+                                                     } 
+                                                     retVal})
+        var chosenDataset = ""                                             
+        if(eligibleDatasets.size > 0) {
+          chosenDataset = eligibleDatasets(random.nextInt(eligibleDatasets.length))
+        } else {
+          chosenDataset = datasets(random.nextInt(datasets.length))
+        }
+        var groupCol:Int = 0
+        var aggCol:Int = 1
+        if(chosenDataset.contains("customer")) {
+          groupCol = 3
+          aggCol = 5
+        } else if (chosenDataset.contains("orders")) {
+          groupCol = 1
+          aggCol = 0
+        } else if (chosenDataset.contains("part") && !chosenDataset.contains("partsupp")) {
+          groupCol = 3
+          aggCol = 7
+        }
+        //Check whether the current dataset will be shared
+        if(random.nextDouble() < probShare) { //sharing
+          //
+          var numJobs = random.nextInt(maxSharedJobs)
+          if(numJobs < 2)
+            numJobs = 2
+
+          val proximity = random.nextInt(maxGap + 1)
+          cachePlanner.addQueryToPool("pool"+(poolsIndex+1),new Query(chosenDataset,QueryOperation(random.nextInt(QueryOperation.values.size)),groupCol,aggCol,"\\|",10))
+          outstandingDatasets += new GeneratorUtilObj(chosenDataset, proximity, numJobs - 1, poolIndex)
+         // println("Adding outstanding dataset: "+chosenDataset+", with proximity: "+proximity+", numJobs: "+numJobs+", at last Index: "+poolIndex)
+        } else {
+          //randomly pick an operation
+          cachePlanner.addQueryToPool("pool"+(poolsIndex+1),new Query(chosenDataset,QueryOperation(random.nextInt(QueryOperation.values.size)),groupCol,aggCol,"\\|",10))
+        }        
+      }           
+    } 
+  }
+  
   
   //prints out the contents of the queues
   def printQueues(cachePlanner: CachePlanner) {
@@ -241,7 +343,9 @@ object SparkQueriesPlannerDriver {
     println("-load <path to binary file to load queues> ")
     println("-save <path to file to save the queue>")
     println("-print - prints queue")
-    println("-generate <num queries> <share probability> <period> - Generates a workload (fills the queues) with the given parameter")
+    //println("-generate <num queries> <share probability> <period> - Generates a workload (fills the queues) with the given parameter")
+    //probShare: Double, maxGap: Int, maxSharedJobs: Int
+    println("-generate <num queries> <share probability> <maxGap> <maxSharedJobs> - Generates a workload (fills the queues) with the given parameter")
     println("-norun - don't run the workload")
   }
   
