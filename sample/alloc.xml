@@ -9,6 +9,9 @@
   <pool name="pool3">
      <weight>25</weight>
   </pool>
+  <pool name="pool4">
+     <weight>25</weight>
+  </pool>
   <pool name="pool1pool2">
      <weight>50</weight>
   </pool>
