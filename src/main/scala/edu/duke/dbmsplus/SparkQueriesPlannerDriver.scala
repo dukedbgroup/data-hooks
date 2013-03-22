@@ -38,6 +38,7 @@ object SparkQueriesPlannerDriver {
     var generateMaxGap: Int = 5
     var generateMaxSharedJobs: Int = 5
     var norun: Boolean = false
+    var programName: String = "Spark Queries Planner"
     while (i < args.length) {
       if(args(i) == "-s") {
         sparkAddress = args(i+1)
@@ -76,14 +77,17 @@ object SparkQueriesPlannerDriver {
         i = i + 4
       } else if (args(i) == "-norun") {
         norun = true
-      }       
+      } else if (args(i) == "-n") {
+        programName = args(i+1)
+        i = i + 1
+      }      
       i = i + 1
     }
     if(sparkAddress == "" || hdfsAddress == "") {
       printHelp()
       System.exit(0)
     } else {
-      val cachePlanner = new CachePlanner(sparkAddress, hdfsAddress)
+      val cachePlanner = new CachePlanner(programName, sparkAddress, hdfsAddress)
       cachePlanner.batchPeriodicity = batchPeriodicity
       cachePlanner.maxQueriesPerQueueinBatch = queriesPerQueue
       cachePlanner.minSharedjobs = minSharedJobs
@@ -335,6 +339,7 @@ object SparkQueriesPlannerDriver {
   def printHelp() {
     println("SparkQueriesPlannerDriver -s <spark address> -h <hdfs address> [optional parameters]")
     println("optional parameters:")
+    println("-n <name or ID of Program (Default: Spark Queries Planner>")
     println("-c <nocache (default) | cache> - The planner strategy to use")
     println("-p <periodicity (default 0)> - The periodicity to check the queue")
     println("-q <queries per queue in batch (default -1) > - The number of queries in each queue to look ahead")

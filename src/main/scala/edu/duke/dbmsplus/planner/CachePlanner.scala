@@ -22,13 +22,13 @@ import edu.duke.dbmsplus.planner.QueryOperation._
  *    2. The single cache strategy batches the submission process. It periodically grabs at most X number of queries in each queue then decide which dataset to cache
  *       It submits the dataset caching query and rewrites the queries that read from this dataset to use the cached dataset instead. 
  */
-class CachePlanner(sparkMaster: String, hdfsMaster: String) {
+class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String) {
   //External Queues
   val poolNameToPool = new HashMap[String, Pool]
   var pools = new ArrayBuffer[Pool]
   
   //SparkContext
-  val sc = new SparkContext(sparkMaster, "Spark Cache Queries Planner", "/usr/local/spark-0.6.1", List("/root/sparkqueriesplanner_2.9.2-1.0.jar"))
+  val sc = new SparkContext(sparkMaster, programName, "/usr/local/spark-0.6.1", List("/root/sparkqueriesplanner_2.9.2-1.0.jar"))
   var sparkEnv: SparkEnv = SparkEnv.get
   
   //Cached RDDs
