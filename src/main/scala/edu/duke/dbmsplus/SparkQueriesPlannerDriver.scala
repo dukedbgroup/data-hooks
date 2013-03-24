@@ -39,6 +39,7 @@ object SparkQueriesPlannerDriver {
     var generateMaxSharedJobs: Int = 5
     var norun: Boolean = false
     var programName: String = "Spark Queries Planner"
+    var doAnalyze: Boolean = false
     while (i < args.length) {
       if(args(i) == "-s") {
         sparkAddress = args(i+1)
@@ -80,46 +81,60 @@ object SparkQueriesPlannerDriver {
       } else if (args(i) == "-n") {
         programName = args(i+1)
         i = i + 1
-      }      
+      } else if (args(i) == "-analyze") {
+        doAnalyze = true
+      }     
       i = i + 1
     }
     if(sparkAddress == "" || hdfsAddress == "") {
       printHelp()
       System.exit(0)
     } else {
-      val cachePlanner = new CachePlanner(programName, sparkAddress, hdfsAddress)
-      cachePlanner.batchPeriodicity = batchPeriodicity
-      cachePlanner.maxQueriesPerQueueinBatch = queriesPerQueue
-      cachePlanner.minSharedjobs = minSharedJobs
-      
+      var planner: Planner = null
+      if(!doAnalyze) {
+        planner = new CachePlanner(programName, sparkAddress, hdfsAddress)
+        planner.asInstanceOf[CachePlanner].batchPeriodicity = batchPeriodicity
+        planner.asInstanceOf[CachePlanner].maxQueriesPerQueueinBatch = queriesPerQueue
+        planner.asInstanceOf[CachePlanner].minSharedjobs = minSharedJobs
+      } else {
+        planner = new CachePlannerAnalyzer
+        planner.asInstanceOf[CachePlannerAnalyzer].batchPeriodicity = batchPeriodicity
+        planner.asInstanceOf[CachePlannerAnalyzer].maxQueriesPerQueueinBatch = queriesPerQueue
+        planner.asInstanceOf[CachePlannerAnalyzer].minSharedjobs = minSharedJobs
+      }
+
       if(loadFile == "") {
         val poolNames = new ArrayBuffer[String]
         for(i <- 1 until (numQueues+1))
           poolNames += ("pool"+i)
-          cachePlanner.initialize(poolNames: _*)
-        //prepopulateQueues(cachePlanner)
-          //generateWorkload(cachePlanner, generateNumQueries, generateShareProb, generatePeriod)
-          generateWorkload2(cachePlanner, generateNumQueries, generateShareProb, generateMaxGap, generateMaxSharedJobs)
+          planner.initialize(poolNames: _*)
+        //prepopulateQueues(planner)
+          //generateWorkload(planner, generateNumQueries, generateShareProb, generatePeriod)
+          generateWorkload2(planner, generateNumQueries, generateShareProb, generateMaxGap, generateMaxSharedJobs)
       } else {
-        loadQueriesIntoQueuesFromFile(cachePlanner, loadFile)
+        loadQueriesIntoQueuesFromFile(planner, loadFile)
       }
       if(saveFile != "") {
-        saveQueuesToFile(cachePlanner, saveFile)
+        saveQueuesToFile(planner, saveFile)
       }
       if(printOutQueues)
-        printQueues(cachePlanner)
-      
-      if(!norun)  
+        printQueues(planner)
+      if(!norun && !doAnalyze)  
         if(cacheOption == "nocache")
-          cachePlanner.start(1)
+          planner.asInstanceOf[CachePlanner].start(1)
         else
-          cachePlanner.start(2)
-                   
+          planner.asInstanceOf[CachePlanner].start(2)
+      if(doAnalyze) 
+        if(cacheOption == "nocache")
+          planner.asInstanceOf[CachePlannerAnalyzer].analyze(1)
+        else
+          planner.asInstanceOf[CachePlannerAnalyzer].analyze(2)
+
     }    
   }
   
   //Query(val input: String, val operation: String, val groupCol: Int, val aggCol: Int, val separator: String, val parallelism: Int)
-  def prepopulateQueues(cachePlanner: CachePlanner) {
+  def prepopulateQueues(cachePlanner: Planner) {
     cachePlanner.addQueryToPool("pool1", new Query("/tpch/partsupp",Count,0,1,"\\|",10))
     cachePlanner.addQueryToPool("pool2", new Query("/tpch/partsupp",Sum,0,1,"\\|",10))
     cachePlanner.addQueryToPool("pool3", new Query("/tpch/partsupp",Max,0,1,"\\|",10))
@@ -127,7 +142,7 @@ object SparkQueriesPlannerDriver {
   }
   
   //Query(val input: String, val operation: String, val groupCol: Int, val aggCol: Int, val separator: String, val parallelism: Int)
-  def prepopulateQueues2(cachePlanner: CachePlanner) {
+  def prepopulateQueues2(cachePlanner: Planner) {
     cachePlanner.addQueryToPool("pool1", new Query("/tpch2/partsupp",CountByKey,0,1,"\\|",10))
     cachePlanner.addQueryToPool("pool2", new Query("/tpch2/partsupp",Mean,0,1,"\\|",10))
     cachePlanner.addQueryToPool("pool3", new Query("/tpch2/partsupp",Variance,0,1,"\\|",10))
@@ -137,7 +152,7 @@ object SparkQueriesPlannerDriver {
   //This will populate each queue with numQueriesPerQueue queries
   //Assumes that basedatasets are in /tpch/
   //probShare is the probability that you will have a shared dataset within a period (period > 1)
-  def generateWorkload(cachePlanner: CachePlanner, numQueriesPerQueue: Int, probShare: Double, period: Int) {
+  def generateWorkload(cachePlanner: Planner, numQueriesPerQueue: Int, probShare: Double, period: Int) {
     //randomly picks a dataset, then decide whether there will be sharing
     val datasets = Array("/tpch/partsupp", "/tpch/orders", "/tpch/customer", "/tpch/part", 
                          "/tpch2/partsupp", "/tpch2/orders", "/tpch2/customer", "/tpch2/part",
@@ -202,13 +217,27 @@ object SparkQueriesPlannerDriver {
   //probShare is the probability that you will have a shared dataset
   //maxGap is the maximum temporal spread between jobs that share the same dataset
   //maxSharedJobs is the maximum number of jobs that share the same dataset
-  def generateWorkload2(cachePlanner: CachePlanner, numQueriesPerQueue: Int, probShare: Double, maxGap: Int, maxSharedJobs: Int) {
+  def generateWorkload2(cachePlanner: Planner, numQueriesPerQueue: Int, probShare: Double, maxGap: Int, maxSharedJobs: Int) {
     //randomly picks a dataset, then decide whether there will be sharing
-    val datasets = Array("/tpch/partsupp", "/tpch/orders", "/tpch/customer", "/tpch/part", 
-                         "/tpch2/partsupp", "/tpch2/orders", "/tpch2/customer", "/tpch2/part",
-                         "/tpch3/partsupp", "/tpch3/orders", "/tpch3/customer", "/tpch3/part",
-                         "/tpch4/partsupp", "/tpch4/orders", "/tpch4/customer", "/tpch4/part",
-                         "/tpch5/partsupp", "/tpch5/orders", "/tpch5/customer", "/tpch5/part")
+    //val datasets = Array("/tpch/partsupp", "/tpch/orders", "/tpch/customer", "/tpch/part", 
+    //                     "/tpch2/partsupp", "/tpch2/orders", "/tpch2/customer", "/tpch2/part",
+    //                     "/tpch3/partsupp", "/tpch3/orders", "/tpch3/customer", "/tpch3/part",
+    //                     "/tpch4/partsupp", "/tpch4/orders", "/tpch4/customer", "/tpch4/part",
+    //                     "/tpch5/partsupp", "/tpch5/orders", "/tpch5/customer", "/tpch5/part")
+
+    val numDistinctDatasets: Int = 80
+    val datasets = new ArrayBuffer[String]
+    var dIndex: Int = 0
+    //println("Printing List of Input Datasets")
+    while (dIndex < numDistinctDatasets/2) {
+      datasets += ("/tpch"+((dIndex%(numDistinctDatasets/2))+1)+"/partsupp")
+      datasets += ("/tpch"+((dIndex%(numDistinctDatasets/2))+1)+"/orders")
+      //println(("/tpch"+((dIndex%(numDistinctDatasets/2))+1)+"/orders"))
+      //println(("/tpch"+((dIndex%(numDistinctDatasets/2))+1)+"/partsupp"))
+      dIndex = dIndex + 1
+    } //For now we just use partsupp and orders table because the size of these tables are roughly the same, the other tables are either significantly smaller or larger
+
+
     val random = new Random(Platform.currentTime)
     
     val outstandingDatasets = new ArrayBuffer[GeneratorUtilObj]
@@ -234,8 +263,8 @@ object SparkQueriesPlannerDriver {
           groupCol = 3
           aggCol = 7
         }
-        cachePlanner.addQueryToPool("pool"+(poolsIndex+1),new Query(currentDataset.dataset,QueryOperation(random.nextInt(QueryOperation.values.size)),groupCol,aggCol,"\\|",10))
-       // println("Using outstanding dataset: "+currentDataset.dataset+", with proximity: "+currentDataset.proximity+", numJobs: "+currentDataset.numJobs+", at last Index: "+poolIndex)
+        cachePlanner.addQueryToPool("pool"+(poolsIndex+1),new Query(currentDataset.dataset,QueryOperation(random.nextInt(QueryOperation.values.size-1)+1),groupCol,aggCol,"\\|",10))
+       //println("Using outstanding dataset: "+currentDataset.dataset+", with proximity: "+currentDataset.proximity+", numJobs: "+currentDataset.numJobs+", at last Index: "+poolIndex)
         currentDataset.numJobs = currentDataset.numJobs - 1
         if(currentDataset.numJobs <= 0) {
           //remove this from the outstandingDatasets
@@ -246,18 +275,21 @@ object SparkQueriesPlannerDriver {
         
       }
       else { //No outstanding dataset is eligible to be added, so we just pick one
-        val eligibleDatasets = datasets.filter(a => {var retVal:Boolean = true
-                                                     for(item <- outstandingDatasets) {
-                                                       if(item.dataset == a)
-                                                         retVal = false
-                                                     } 
-                                                     retVal})
-        var chosenDataset = ""                                             
-        if(eligibleDatasets.size > 0) {
-          chosenDataset = eligibleDatasets(random.nextInt(eligibleDatasets.length))
-        } else {
-          chosenDataset = datasets(random.nextInt(datasets.length))
-        }
+        //val eligibleDatasets = datasets.filter(a => {var retVal:Boolean = true
+        //                                             for(item <- outstandingDatasets) {
+        //                                               if(item.dataset == a)
+        //                                                 retVal = false
+        //                                             } 
+        //                                             retVal})
+        //var chosenDataset = ""                                             
+        //if(eligibleDatasets.size > 0) {
+        //  chosenDataset = eligibleDatasets(random.nextInt(eligibleDatasets.length))
+        //} else {
+        //  chosenDataset = datasets(random.nextInt(datasets.length))
+       // }
+        val chosenDataset = datasets(random.nextInt(datasets.size))
+        //we remove from chosenDataset the list of datasets
+        datasets -= chosenDataset
         var groupCol:Int = 0
         var aggCol:Int = 1
         if(chosenDataset.contains("customer")) {
@@ -270,6 +302,7 @@ object SparkQueriesPlannerDriver {
           groupCol = 3
           aggCol = 7
         }
+        //println("Chosen Dataset: "+chosenDataset)
         //Check whether the current dataset will be shared
         if(random.nextDouble() < probShare) { //sharing
           //
@@ -277,13 +310,13 @@ object SparkQueriesPlannerDriver {
           if(numJobs < 2)
             numJobs = 2
 
-          val proximity = random.nextInt(maxGap + 1)
-          cachePlanner.addQueryToPool("pool"+(poolsIndex+1),new Query(chosenDataset,QueryOperation(random.nextInt(QueryOperation.values.size)),groupCol,aggCol,"\\|",10))
+          val proximity = maxGap//random.nextInt(maxGap + 1)
+          cachePlanner.addQueryToPool("pool"+(poolsIndex+1),new Query(chosenDataset,QueryOperation(random.nextInt(QueryOperation.values.size-1)+1),groupCol,aggCol,"\\|",10))
           outstandingDatasets += new GeneratorUtilObj(chosenDataset, proximity, numJobs - 1, poolIndex)
-         // println("Adding outstanding dataset: "+chosenDataset+", with proximity: "+proximity+", numJobs: "+numJobs+", at last Index: "+poolIndex)
+          //println("Will be shared: "+chosenDataset+", with proximity: "+proximity+", numJobs: "+numJobs+", at last Index: "+poolIndex)
         } else {
           //randomly pick an operation
-          cachePlanner.addQueryToPool("pool"+(poolsIndex+1),new Query(chosenDataset,QueryOperation(random.nextInt(QueryOperation.values.size)),groupCol,aggCol,"\\|",10))
+          cachePlanner.addQueryToPool("pool"+(poolsIndex+1),new Query(chosenDataset,QueryOperation(random.nextInt(QueryOperation.values.size-1)+1),groupCol,aggCol,"\\|",10))
         }        
       }           
     } 
@@ -291,7 +324,7 @@ object SparkQueriesPlannerDriver {
   
   
   //prints out the contents of the queues
-  def printQueues(cachePlanner: CachePlanner) {
+  def printQueues(cachePlanner: Planner) {
     val keys = cachePlanner.poolNameToPool.keys.toList.sorted//new ArrayBuffer[String]    
     
     for(key <- keys) {
@@ -318,7 +351,7 @@ object SparkQueriesPlannerDriver {
   }
   
   //Function that deserializes a file and loads the queries into the queues
-  def loadQueriesIntoQueuesFromFile(cachePlanner: CachePlanner, file: String) {
+  def loadQueriesIntoQueuesFromFile(cachePlanner: Planner, file: String) {
     val input = new ObjectInputStream(new FileInputStream(file))
     val obj = input.readObject().asInstanceOf[HashMap[String,Pool]]
     for(key <- obj.keySet) {
@@ -329,7 +362,7 @@ object SparkQueriesPlannerDriver {
   }
   
   //Function that serializes the queues into a file
-  def saveQueuesToFile(cachePlanner: CachePlanner, file: String) {
+  def saveQueuesToFile(cachePlanner: Planner, file: String) {
     val store = new ObjectOutputStream(new FileOutputStream(new File(file)))
     store.writeObject(cachePlanner.poolNameToPool)
     store.close()
@@ -351,6 +384,7 @@ object SparkQueriesPlannerDriver {
     //println("-generate <num queries> <share probability> <period> - Generates a workload (fills the queues) with the given parameter")
     //probShare: Double, maxGap: Int, maxSharedJobs: Int
     println("-generate <num queries> <share probability> <maxGap> <maxSharedJobs> - Generates a workload (fills the queues) with the given parameter")
+    println("-analyze - print analysis stats")
     println("-norun - don't run the workload")
   }
   

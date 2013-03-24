@@ -22,11 +22,7 @@ import edu.duke.dbmsplus.planner.QueryOperation._
  *    2. The single cache strategy batches the submission process. It periodically grabs at most X number of queries in each queue then decide which dataset to cache
  *       It submits the dataset caching query and rewrites the queries that read from this dataset to use the cached dataset instead. 
  */
-class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String) {
-  //External Queues
-  val poolNameToPool = new HashMap[String, Pool]
-  var pools = new ArrayBuffer[Pool]
-  
+class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String) extends Planner{
   //SparkContext
   val sc = new SparkContext(sparkMaster, programName, "/usr/local/spark-0.6.1", List("/root/sparkqueriesplanner_2.9.2-1.0.jar"))
   var sparkEnv: SparkEnv = SparkEnv.get
@@ -53,26 +49,6 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
 
   implicit def whateverToRunnable[F](f: => F) = new Runnable() { def run() { f } }
 
-  //Add a query to the specified pool 
-  def addQueryToPool(poolName: String, query: Query) {
-    pools.synchronized {
-      if(poolNameToPool.contains(poolName))          
-        poolNameToPool(poolName).queryQueue += query          
-      else
-        poolNameToPool("default").queryQueue += query
-      pools.notifyAll
-    }
-  }
-  
-  //Initialize the pools with the specified names
-  def initialize(names:String*) {
-    for(name <- names){
-      val pool = new Pool(name)
-      pools += pool
-      poolNameToPool(name) = pool
-    }      
-  }  
-  
   //Start the planner
   //strat - 1 baseline, no cache optimization
   //strat - 2 batch head of queues, pick most commonly used dataset
@@ -164,7 +140,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         for(key <-poolNameToPool.keys) {
           val pool = poolNameToPool(key)
           if(pool.queryQueue.size > 0) {
-	        if(maxQueriesPerQueueinBatch < 0) {
+	        if(maxQueriesPerQueueinBatch < 0 || (maxQueriesPerQueueinBatch > pool.queryQueue.size)) {
               poolNameToQueries(key) = pool.queryQueue.clone()
               pool.queryQueue.clear
             } else {
@@ -284,23 +260,33 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         }      
       }
 */
-      val lastQueryInQueue = queries(queries.size -1)
-      queries.trimEnd(1)
+
+      val futures = new ArrayBuffer[Future[_]]
+      //val lastQueryInQueue = queries(queries.size -1)
+      //queries.trimEnd(1)
       for(i <- 0 until queries.size) {
         if(inputRDDPair != null && queries(i).input == inputRDDPair._1) {
-          threadPool.execute(new QueryToSpark(queries(i), poolName, inputRDDPair._2))
+          //threadPool.execute(new QueryToSpark(queries(i), poolName, inputRDDPair._2))
+          val future = threadPool.submit(new QueryToSpark(queries(i), poolName, inputRDDPair._2))
+          futures += future
         } else {
-          threadPool.execute(new QueryToSpark(queries(i), poolName))
+          //threadPool.execute(new QueryToSpark(queries(i), poolName))
+          val future = threadPool.submit(new QueryToSpark(queries(i), poolName))
+          futures += future          
         }
       }
+      for(future <- futures) {
+        future.get
+      }
+ 
       //We wait until the last query has finished before returning
-      if(inputRDDPair != null && lastQueryInQueue.input == inputRDDPair._1) {
+  /*    if(inputRDDPair != null && lastQueryInQueue.input == inputRDDPair._1) {
         val future = threadPool.submit(new QueryToSpark(lastQueryInQueue, poolName, inputRDDPair._2))
         future.get
       } else {
         val future = threadPool.submit(new QueryToSpark(lastQueryInQueue, poolName))
         future.get
-      }
+      }*/
       queries.clear
     }
   }
@@ -511,15 +497,5 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
     }
   }
 }
-
-
-/**
- * An internal representation of a pool (Queue. It contains an ArrayBuffer of TaskSets and also weight
- */
-class Pool(val name: String) extends Serializable
-{
-  var queryQueue = new ArrayBuffer[Query]
-}
-
 
 
