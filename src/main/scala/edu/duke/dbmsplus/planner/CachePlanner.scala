@@ -52,7 +52,6 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
   //Start the planner
   //strat - 1 baseline, no cache optimization
   //strat - 2 batch head of queues, pick most commonly used dataset
-  //strat - 3 batch head of queues, cache all common dataset
   def start(strat: Int) {
     if(!hasStarted) {
       hasEnded = false
@@ -69,9 +68,6 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         t.start
       } else if(strat == 2) {
         val t = new Thread(startCacheSingle())
-        t.start
-      } else if(strat == 3) { 
-        val t = new Thread(startCacheAll())
         t.start
       } else { //Strategy not found
         hasStarted = false
@@ -237,16 +233,8 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
     hasStarted = false
   }
 
-  def startCacheAll() {
-    println("Starting Planner with all caching, batch periodicity:"+batchPeriodicity+", max queries per queue in batch:"+maxQueriesPerQueueinBatch)
-    while(!hasEnded) {
 
-    }
-  }
-
-
-  //A Thread that goes through a list of query and submits it sequentially (does not launch separate thread for each query)
-  // Update: launches separate thread for each query
+  //A Thread that goes through a list of queries and submits it sequentially by launching separate submission threads for each query
   class PoolSubmissionThread(queries: ArrayBuffer[Query], poolName: String, inputRDDPair: (String,RDD[String]) = null) extends Runnable {
     override def run(): Unit = {
 /*      SparkEnv.set(sparkEnv)
@@ -262,15 +250,11 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
 */
 
       val futures = new ArrayBuffer[Future[_]]
-      //val lastQueryInQueue = queries(queries.size -1)
-      //queries.trimEnd(1)
       for(i <- 0 until queries.size) {
         if(inputRDDPair != null && queries(i).input == inputRDDPair._1) {
-          //threadPool.execute(new QueryToSpark(queries(i), poolName, inputRDDPair._2))
           val future = threadPool.submit(new QueryToSpark(queries(i), poolName, inputRDDPair._2))
           futures += future
         } else {
-          //threadPool.execute(new QueryToSpark(queries(i), poolName))
           val future = threadPool.submit(new QueryToSpark(queries(i), poolName))
           futures += future          
         }
@@ -278,15 +262,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
       for(future <- futures) {
         future.get
       }
- 
-      //We wait until the last query has finished before returning
-  /*    if(inputRDDPair != null && lastQueryInQueue.input == inputRDDPair._1) {
-        val future = threadPool.submit(new QueryToSpark(lastQueryInQueue, poolName, inputRDDPair._2))
-        future.get
-      } else {
-        val future = threadPool.submit(new QueryToSpark(lastQueryInQueue, poolName))
-        future.get
-      }*/
+
       queries.clear
     }
   }

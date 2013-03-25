@@ -275,18 +275,7 @@ object SparkQueriesPlannerDriver {
         
       }
       else { //No outstanding dataset is eligible to be added, so we just pick one
-        //val eligibleDatasets = datasets.filter(a => {var retVal:Boolean = true
-        //                                             for(item <- outstandingDatasets) {
-        //                                               if(item.dataset == a)
-        //                                                 retVal = false
-        //                                             } 
-        //                                             retVal})
-        //var chosenDataset = ""                                             
-        //if(eligibleDatasets.size > 0) {
-        //  chosenDataset = eligibleDatasets(random.nextInt(eligibleDatasets.length))
-        //} else {
-        //  chosenDataset = datasets(random.nextInt(datasets.length))
-       // }
+
         val chosenDataset = datasets(random.nextInt(datasets.size))
         //we remove from chosenDataset the list of datasets
         datasets -= chosenDataset
