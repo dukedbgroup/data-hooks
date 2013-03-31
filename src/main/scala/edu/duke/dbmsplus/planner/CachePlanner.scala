@@ -28,7 +28,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
   var sparkEnv: SparkEnv = SparkEnv.get
   
   //Cached RDDs
-  val datasetToRDD  = new HashMap[String, RDD[String]]
+  val datasetToRDD  = new HashMap[String, RDD[Array[String]]]
 
   var hasEnded = false
   var hasStarted = false
@@ -235,7 +235,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
 
 
   //A Thread that goes through a list of queries and submits it sequentially by launching separate submission threads for each query
-  class PoolSubmissionThread(queries: ArrayBuffer[Query], poolName: String, inputRDDPair: (String,RDD[String]) = null) extends Runnable {
+  class PoolSubmissionThread(queries: ArrayBuffer[Query], poolName: String, inputRDDPair: (String,RDD[Array[String]]) = null) extends Runnable {
     override def run(): Unit = {
 /*      SparkEnv.set(sparkEnv)
       sc.initLocalProperties
@@ -361,7 +361,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
   }
 
   //This class is used to submit a query in a separate thread to Spark
-  class QueryToSpark(query: Query, poolName: String, rdd: RDD[String] = null) extends Runnable {
+  class QueryToSpark(query: Query, poolName: String, rdd: RDD[Array[String]] = null) extends Runnable {
     override def run(): Unit = {
       SparkEnv.set(sparkEnv)
       sc.initLocalProperties
@@ -377,35 +377,35 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           if(query.operation == Sum || query.operation == Min || query.operation == Max) {
             val mapToKV = file.map(line => {
               val splits = line.split(separator)
-              (splits(groupCol),splits(aggCol).toDouble) }
-            )
+              (splits(groupCol).toLong,splits(aggCol).toDouble) 
+            }).filter(input => input._1 < 20)
             if(query.operation == Sum) {
               val reduceByKey = mapToKV.reduceByKey(_ + _, query.parallelism)
-              sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})            
+              sc.runJob(reduceByKey, (iter: Iterator[(Long,Double)]) => {})            
             } else if(query.operation == Max) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {max(a,b)},query.parallelism)
-              sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
+              sc.runJob(reduceByKey, (iter: Iterator[(Long,Double)]) => {})
             } else if(query.operation == Min) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {min(a,b)},query.parallelism)
-              sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
+              sc.runJob(reduceByKey, (iter: Iterator[(Long,Double)]) => {})
             } 
           } else {
             val mapToKV = file.map(line => {
               val splits = line.split(separator)
-              (splits(groupCol),new Stats(splits(aggCol).toDouble)) }            
-            )
+              (splits(groupCol).toLong,new Stats(splits(aggCol).toDouble)) 
+            }).filter(input => input._1 < 20)
             if(query.operation == CountByKey) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)}, query.parallelism)
               val countByKey = reduceByKey.map(line => { (line._1,line._2.count)})
-              sc.runJob(countByKey, (iter: Iterator[(String,Long)]) => {})            
+              sc.runJob(countByKey, (iter: Iterator[(Long,Long)]) => {})            
             } else if(query.operation == Mean) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)},query.parallelism)
               val meanByKey = reduceByKey.map(line => { (line._1,line._2.mean)})
-              sc.runJob(meanByKey, (iter: Iterator[(String,Double)]) => {})
+              sc.runJob(meanByKey, (iter: Iterator[(Long,Double)]) => {})
             } else if(query.operation == Variance) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)},query.parallelism)
               val varianceByKey = reduceByKey.map(line => { (line._1,line._2.variance)})
-              sc.runJob(varianceByKey, (iter: Iterator[(String,Double)]) => {})
+              sc.runJob(varianceByKey, (iter: Iterator[(Long,Double)]) => {})
             }
           }
         }
@@ -420,36 +420,34 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           val aggCol = query.aggCol          
           if(query.operation == Sum || query.operation == Min || query.operation == Max) {
             val mapToKV = rdd.map(line => {
-              val splits = line.split(separator)
-              (splits(groupCol),splits(aggCol).toDouble) }
+                (line(groupCol).toLong,line(aggCol).toDouble)}
             )
             if(query.operation == Sum) {
               val reduceByKey = mapToKV.reduceByKey(_ + _, query.parallelism)
-              sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
+              sc.runJob(reduceByKey, (iter: Iterator[(Long,Double)]) => {})
             } else if(query.operation == Max) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {max(a,b)},query.parallelism)
-              sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
+              sc.runJob(reduceByKey, (iter: Iterator[(Long,Double)]) => {})
             } else if(query.operation == Min) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {min(a,b)},query.parallelism)
-              sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
+              sc.runJob(reduceByKey, (iter: Iterator[(Long,Double)]) => {})
             }
           } else {
             val mapToKV = rdd.map(line => {
-              val splits = line.split(separator)
-              (splits(groupCol),new Stats(splits(aggCol).toDouble)) }            
+                (line(groupCol).toLong,new Stats(line(aggCol).toDouble))}
             )
             if(query.operation == CountByKey) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)}, query.parallelism)
               val countByKey = reduceByKey.map(line => { (line._1,line._2.count)})
-              sc.runJob(countByKey, (iter: Iterator[(String,Long)]) => {})            
+              sc.runJob(countByKey, (iter: Iterator[(Long,Long)]) => {})            
             } else if(query.operation == Mean) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)},query.parallelism)
               val meanByKey = reduceByKey.map(line => { (line._1,line._2.mean)})
-              sc.runJob(meanByKey, (iter: Iterator[(String,Double)]) => {})
+              sc.runJob(meanByKey, (iter: Iterator[(Long,Double)]) => {})
             } else if(query.operation == Variance) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)},query.parallelism)
               val varianceByKey = reduceByKey.map(line => { (line._1,line._2.variance)})
-              sc.runJob(varianceByKey, (iter: Iterator[(String,Double)]) => {})
+              sc.runJob(varianceByKey, (iter: Iterator[(Long,Double)]) => {})
             }
           }
         }        
@@ -463,12 +461,17 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
     override def run(): Unit = {
       SparkEnv.set(sparkEnv)
       val cachedDataset = sc.textFile(hdfsMaster+"/"+dataset)
+      val mapToArray = cachedDataset.map(line => {
+              line.split("\\|")
+              }
+            )
+
       sc.initLocalProperties
       sc.addLocalProperties("spark.scheduler.cluster.fair.pool", poolName)
-      cachedDataset.persist(spark.storage.StorageLevel.MEMORY_ONLY)
-      sc.runJob(cachedDataset, (iter: Iterator[String]) => {})
+      mapToArray.persist(spark.storage.StorageLevel.MEMORY_ONLY)
+      sc.runJob(mapToArray, (iter: Iterator[Array[String]]) => {})
       datasetToRDD.synchronized {
-        datasetToRDD(dataset) = cachedDataset
+          datasetToRDD(dataset) = mapToArray
       }
     }
   }
