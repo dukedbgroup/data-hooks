@@ -59,8 +59,8 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
       threadPool = Executors.newFixedThreadPool(maxThreads)
       
       //preprocess (hacky way to fix the bug where the first job does not get any preferred locations (locations are not registered until after 1 job has been run)
-      val data = Array.range(1,100,1)
-      val distData = sc.parallelize(data,100)
+      val data = Array.range(1,200,1)
+      val distData = sc.parallelize(data,200)
       distData.reduce(_ + _)
 
       if(strat == 1) {
@@ -378,7 +378,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
             val mapToKV = file.map(line => {
               val splits = line.split(separator)
               (splits(groupCol).toLong,splits(aggCol).toDouble) 
-            }).filter(input => input._1 < 20)
+            })
             if(query.operation == Sum) {
               val reduceByKey = mapToKV.reduceByKey(_ + _, query.parallelism)
               sc.runJob(reduceByKey, (iter: Iterator[(Long,Double)]) => {})            
@@ -393,7 +393,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
             val mapToKV = file.map(line => {
               val splits = line.split(separator)
               (splits(groupCol).toLong,new Stats(splits(aggCol).toDouble)) 
-            }).filter(input => input._1 < 20)
+            })
             if(query.operation == CountByKey) {
               val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)}, query.parallelism)
               val countByKey = reduceByKey.map(line => { (line._1,line._2.count)})
