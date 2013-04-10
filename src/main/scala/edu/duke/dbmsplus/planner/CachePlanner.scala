@@ -210,7 +210,8 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(poolName),poolName,(maxDataset._1,datasetToRDD(maxDataset._1))))
           futures += future
         }
-        for(future <- futures) {
+        //PoolSubmissionThread will only wait for queries in the pool that uses cached datasets
+        for(future <- futures) { 
           future.get
         }        
       } else { //no common dataset to cache so just submit everything
@@ -248,15 +249,15 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         }      
       }
 */
-
       val futures = new ArrayBuffer[Future[_]]
+      //We only wait for queries that depend on cached dataset
       for(i <- 0 until queries.size) {
         if(inputRDDPair != null && queries(i).input == inputRDDPair._1) {
           val future = threadPool.submit(new QueryToSpark(queries(i), poolName, inputRDDPair._2))
           futures += future
         } else {
           val future = threadPool.submit(new QueryToSpark(queries(i), poolName))
-          futures += future          
+//          futures += future          
         }
       }
       for(future <- futures) {
