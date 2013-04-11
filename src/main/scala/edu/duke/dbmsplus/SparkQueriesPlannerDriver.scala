@@ -229,8 +229,8 @@ object SparkQueriesPlannerDriver {
     val datasets = new ArrayBuffer[String]
     var dIndex: Int = 0
     //println("Printing List of Input Datasets")
-    while (dIndex < numDistinctDatasets/2) {
-      datasets += ("/tpch"+((dIndex%(numDistinctDatasets/2))+1)+"/partsupp")
+    while (dIndex < numDistinctDatasets/*/2*/) {
+      //datasets += ("/tpch"+((dIndex%(numDistinctDatasets/2))+1)+"/partsupp")
       datasets += ("/tpch"+((dIndex%(numDistinctDatasets/2))+1)+"/orders")
       //println(("/tpch"+((dIndex%(numDistinctDatasets/2))+1)+"/orders"))
       //println(("/tpch"+((dIndex%(numDistinctDatasets/2))+1)+"/partsupp"))
