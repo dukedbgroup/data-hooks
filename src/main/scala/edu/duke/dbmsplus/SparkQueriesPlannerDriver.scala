@@ -122,8 +122,10 @@ object SparkQueriesPlannerDriver {
       if(!norun && !doAnalyze)  
         if(cacheOption == "nocache")
           planner.asInstanceOf[CachePlanner].start(1)
-        else
+        else if(cacheOption == "cache")          
           planner.asInstanceOf[CachePlanner].start(2)
+        else           
+          planner.asInstanceOf[CachePlanner].start(3)
       if(doAnalyze) 
         if(cacheOption == "nocache")
           planner.asInstanceOf[CachePlannerAnalyzer].analyze(1)
@@ -362,7 +364,7 @@ object SparkQueriesPlannerDriver {
     println("SparkQueriesPlannerDriver -s <spark address> -h <hdfs address> [optional parameters]")
     println("optional parameters:")
     println("-n <name or ID of Program (Default: Spark Queries Planner>")
-    println("-c <nocache (default) | cache> - The planner strategy to use")
+    println("-c <nocache (default) | cache | cachePartitioned> - The planner strategy to use")
     println("-p <periodicity (default 0)> - The periodicity to check the queue")
     println("-q <queries per queue in batch (default -1) > - The number of queries in each queue to look ahead")
     println("-j <min shared jobs (default 3)> - number of shared jobs to consider a dataset as cacheable")
