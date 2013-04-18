@@ -272,6 +272,8 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
      
       //search for all possible cacheable datasets
       //Traverse all queries, create frequency map for inputs
+      //The datasetCount is a HashMap with key = dataset name
+      // The value is a tuple3 containing _1 = # of occurence of dataset, _2 = Set of Pools, _3 = HashMap of groupCol as Key and # occurence as value
       val datasetCount = new HashMap[String, (Int,TreeSet[String], HashMap[Int,Int])]
       for(key <- poolNameToQueries.keys) {
         for(query <- poolNameToQueries(key)) {
@@ -296,8 +298,8 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
       }
       
       //Filters the frequencyMap to entries that satisfies the minSharedJobs constraint
-      //Find the max
       val filteredDatasetCount = datasetCount.filter(_._2._1 >= minSharedjobs)
+      //We find the dataset that occurs the most
       var maxDataset: (String,TreeSet[String],Int) = null
       if(filteredDatasetCount.size > 0) {
         val chosenDataset = filteredDatasetCount.maxBy(_._2._1)
@@ -335,7 +337,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         }
         if(!alreadyInCache) {
           println("Caching "+maxDataset._1+" into memory")
-          val cacheFuture = threadPool.submit(new CachePartitionedDataset(maxDataset._1,maxDataset._3,"\\|", cachePoolName))
+          val cacheFuture = threadPool.submit(new CachePartitionedDataset(maxDataset._1,maxDataset._3,cachePoolName))
           cacheFuture.get
         }
        
@@ -452,7 +454,6 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
       }
     }
     else {
-      SparkEnv.set(sparkEnv)
       if(query.operation == Count) {
         rdd.count
       }
@@ -550,7 +551,6 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         }
       }
       else if (rdd != null) {
-        SparkEnv.set(sparkEnv)
         if(query.operation == Count) {
           rdd.count
         } else {
@@ -591,20 +591,128 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           }
         }        
       }
-      else { // partitioned RDD 
-        
+      else if (partitionedRDD != null){ // partitioned RDD - The RDD is already partitioned by GroupCol
+        val cachedRDD = partitionedRDD._1
+        val cachedGroupCol = partitionedRDD._2
+        if(query.operation == Count) {
+          cachedRDD.count
+        } else {
+          val separator = query.separator
+          val groupCol = query.groupCol
+          val aggCol = query.aggCol          
+          if(query.operation == Sum || query.operation == Min || query.operation == Max) {
+            if(cachedGroupCol == groupCol) {//If group col of query is the same as group col of RDD, no need to do reduce
+              //RDD is RDD[(Long,Seq[Array[String]])]
+              if(query.operation == Sum) {
+                val sumRDD = cachedRDD.map(line => {
+                  var sumOutput = 0.0
+                  for(value <- line._2) {
+                    sumOutput += value(aggCol).toDouble
+                  }
+                  (line._1,sumOutput)
+                })
+                sc.runJob(sumRDD, (iter: Iterator[(Long,Double)]) => {})
+              } else if(query.operation == Max) {
+                val maxRDD = cachedRDD.map(line => {
+                  var maxOutput = Double.MinValue
+                  for(value <- line._2) {
+                    val currVal = value(aggCol).toDouble
+                    if(currVal > maxOutput) {
+                      maxOutput = currVal 
+                    }
+                  }
+                  (line._1,maxOutput)
+                })
+                sc.runJob(maxRDD, (iter: Iterator[(Long,Double)]) => {})                                
+              } else if(query.operation == Min) {
+                val minRDD = cachedRDD.map(line => {
+                  var minOutput = Double.MaxValue
+                  for(value <- line._2) {
+                    val currVal = value(aggCol).toDouble
+                    if(currVal < minOutput) {
+                      minOutput = currVal 
+                    }
+                  }
+                  (line._1,minOutput)
+                })
+                sc.runJob(minRDD, (iter: Iterator[(Long,Double)]) => {})                  
+              }               
+            } else { //Not the same group col so have to do reduce (repartition)
+              val mapToKV = cachedRDD.flatMap(line => {
+                val returnList = new ArrayBuffer[(Long, Double)]
+                for(value <- line._2) {
+                  returnList += ((value(groupCol).toLong, value(aggCol).toDouble))
+                }
+                returnList
+              })
+              if(query.operation == Sum) {
+                val reduceByKey = mapToKV.reduceByKey(_ + _, query.parallelism)
+                sc.runJob(reduceByKey, (iter: Iterator[(Long,Double)]) => {})
+              } else if(query.operation == Max) {
+                val reduceByKey = mapToKV.reduceByKey((a,b) => {max(a,b)},query.parallelism)
+                sc.runJob(reduceByKey, (iter: Iterator[(Long,Double)]) => {})
+              } else if(query.operation == Min) {
+                val reduceByKey = mapToKV.reduceByKey((a,b) => {min(a,b)},query.parallelism)
+                sc.runJob(reduceByKey, (iter: Iterator[(Long,Double)]) => {})
+              }              
+            }
+          } else {
+            if(cachedGroupCol == groupCol) {//If group col of query is the same as group col of RDD, no need to do reduce
+              //RDD is RDD[(Long,Seq[Array[String]])]
+              val mapToKV = cachedRDD.map(line => {
+                val stats = new Stats(0)
+                for(value <- line._2) {
+                  stats.merge(value(aggCol).toDouble)
+                }
+                (line._1, stats)
+              })
+              if(query.operation == CountByKey) {
+                val countByKey = mapToKV.map(line => { (line._1,line._2.count)})
+                sc.runJob(countByKey, (iter: Iterator[(Long,Long)]) => {})            
+              } else if(query.operation == Mean) {
+                val meanByKey = mapToKV.map(line => { (line._1,line._2.mean)})
+                sc.runJob(meanByKey, (iter: Iterator[(Long,Double)]) => {})
+              } else if(query.operation == Variance) {
+                val varianceByKey = mapToKV.map(line => { (line._1,line._2.variance)})
+                sc.runJob(varianceByKey, (iter: Iterator[(Long,Double)]) => {})
+              }  
+            } else { // not the same partition key
+              val mapToKV = cachedRDD.flatMap(line => {
+                val returnList = new ArrayBuffer[(Long, Stats)]
+                for(value <- line._2) {
+                  returnList += ((value(groupCol).toLong, new Stats(value(aggCol).toDouble)))
+                }
+                returnList
+              })
+              if(query.operation == CountByKey) {
+                val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)}, query.parallelism)
+                val countByKey = reduceByKey.map(line => { (line._1,line._2.count)})
+                sc.runJob(countByKey, (iter: Iterator[(Long,Long)]) => {})            
+              } else if(query.operation == Mean) {
+                val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)},query.parallelism)
+                val meanByKey = reduceByKey.map(line => { (line._1,line._2.mean)})
+                sc.runJob(meanByKey, (iter: Iterator[(Long,Double)]) => {})
+              } else if(query.operation == Variance) {
+                val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)},query.parallelism)
+                val varianceByKey = reduceByKey.map(line => { (line._1,line._2.variance)})
+                sc.runJob(varianceByKey, (iter: Iterator[(Long,Double)]) => {})
+              }              
+            }
+          }   
+        }
       }
     }
   }
 
   //This class is used to submit a data loading to memory query to spark (cache dataset)
-  class CacheDataset(dataset: String, poolName: String) extends Runnable {
+  class CacheDataset(dataset: String, poolName: String, separator: String = "\\|") extends Runnable {
   //Method that Caches a Dataset and sets the RDD into a hashmap
     override def run(): Unit = {
       SparkEnv.set(sparkEnv)
       val cachedDataset = sc.textFile(hdfsMaster+"/"+dataset)
+      val colSeparator = separator
       val mapToArray = cachedDataset.map(line => {
-              line.split("\\|")
+              line.split(colSeparator)
               }
             )
 
@@ -620,14 +728,14 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
   
   //This class is used to submit a data loading to memory query to spark (cache dataset)
   //It first partitions the dataset by a grouping key
-  class CachePartitionedDataset(dataset: String, groupCol: Int,separator: String, poolName: String) extends Runnable {
+  class CachePartitionedDataset(dataset: String, groupCol: Int,poolName: String, separator: String = "\\|") extends Runnable {
   //Method that Caches a Dataset and sets the RDD into a hashmap
     override def run(): Unit = {
       SparkEnv.set(sparkEnv)
       val file = sc.textFile(hdfsMaster+"/"+dataset)
-      
+      val colSeparator = separator
       val mapToKV = file.map(line => {
-        val splits = line.split(separator)      
+        val splits = line.split(colSeparator)      
         (splits(groupCol).toLong,splits) 
       })
       
