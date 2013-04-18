@@ -595,7 +595,13 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         val cachedRDD = partitionedRDD._1
         val cachedGroupCol = partitionedRDD._2
         if(query.operation == Count) {
-          cachedRDD.count
+          sc.runJob(cachedRDD, (iter: Iterator[(Long,Seq[Array[String]])]) => {
+            var result = 0L
+            while (iter.hasNext) {
+              result += iter.next()._2.size              
+            }
+            result
+          }).sum
         } else {
           val separator = query.separator
           val groupCol = query.groupCol
