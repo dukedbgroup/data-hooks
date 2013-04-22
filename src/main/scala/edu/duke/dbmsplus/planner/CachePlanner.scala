@@ -214,7 +214,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(poolName),poolName,(maxDataset._1,datasetToRDD(maxDataset._1))))
           futures += future
         }
-        //PoolSubmissionThread will only wait for queries in the pool that uses cached datasets
+        
         for(future <- futures) { 
           future.get
         }        
@@ -345,7 +345,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(poolName),poolName,null, (maxDataset._1,datasetToPartitionedRDD(maxDataset._1,maxDataset._3),maxDataset._3)))
           futures += future
         }
-        //PoolSubmissionThread will only wait for queries in the pool that uses cached datasets
+        
         for(future <- futures) { 
           future.get
         }        
@@ -386,7 +386,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
       }
 */
       val futures = new ArrayBuffer[Future[_]]
-      //We only wait for queries that depend on cached dataset
+     
       for(i <- 0 until queries.size) {
         if(inputRDDPair != null && queries(i).input == inputRDDPair._1) {
           val future = threadPool.submit(new QueryToSpark(queries(i), poolName, inputRDDPair._2))
@@ -396,7 +396,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           futures += future
         } else {
           val future = threadPool.submit(new QueryToSpark(queries(i), poolName))
-//          futures += future          
+          futures += future          
         }
       }
       for(future <- futures) {
@@ -506,7 +506,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
       SparkEnv.set(sparkEnv)
       sc.initLocalProperties
       sc.addLocalProperties("spark.scheduler.cluster.fair.pool", poolName)
-      if(rdd == null) { //directly read from HDFS
+      if(rdd == null && partitionedRDD == null) { //directly read from HDFS
         val file = sc.textFile(hdfsMaster+"/"+query.input)
         if(query.operation == Count) {
           file.count
@@ -740,9 +740,10 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
       SparkEnv.set(sparkEnv)
       val file = sc.textFile(hdfsMaster+"/"+dataset)
       val colSeparator = separator
+      val groupColIndex = groupCol
       val mapToKV = file.map(line => {
         val splits = line.split(colSeparator)      
-        (splits(groupCol).toLong,splits) 
+        (splits(groupColIndex).toLong,splits) 
       })
       
       
