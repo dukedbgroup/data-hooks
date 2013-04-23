@@ -33,11 +33,13 @@ object SparkQueriesPlannerDriver {
     var saveFile: String = ""
     var numQueues: Int = 4
     var printOutQueues: Boolean = false
+    var generateBatches: Int = 1
     var generateNumQueries: Int = 40
     var generateShareProb: Double = .2
     var generateMaxGap: Int = 5
     var generateMaxSharedJobs: Int = 5
     var norun: Boolean = false
+    var generatorFlag: Boolean = true
     var programName: String = "Spark Queries Planner"
     var doAnalyze: Boolean = false
     while (i < args.length) {
@@ -76,6 +78,13 @@ object SparkQueriesPlannerDriver {
         generateMaxGap = args(i+3).toInt
         generateMaxSharedJobs = args(i+4).toInt
         i = i + 4
+      } else if(args(i) == "-generateBatch") {
+        generatorFlag = false
+        generateBatches = args(i+1).toInt
+        generateNumQueries = args(i+2).toInt
+        generateShareProb = args(i+3).toDouble
+        i = i + 4
+        //"-generate2 <num batches> <batchSize> <share probability> - Generates a workload (fills the queues) with the given parameter"        
       } else if (args(i) == "-norun") {
         norun = true
       } else if (args(i) == "-n") {
@@ -110,7 +119,10 @@ object SparkQueriesPlannerDriver {
           planner.initialize(poolNames: _*)
         //prepopulateQueues(planner)
           //generateWorkload(planner, generateNumQueries, generateShareProb, generatePeriod)
-          generateWorkload2(planner, generateNumQueries, generateShareProb, generateMaxGap, generateMaxSharedJobs)
+          if(generatorFlag)
+            generateWorkload2(planner, generateNumQueries, generateShareProb, generateMaxGap, generateMaxSharedJobs)
+          else
+            generateWorkloadBatch(planner, generateBatches, generateNumQueries, generateShareProb)
       } else {
         loadQueriesIntoQueuesFromFile(planner, loadFile)
       }
@@ -212,7 +224,54 @@ object SparkQueriesPlannerDriver {
   
   //Utility object that is used by the workloadGenerator
   class GeneratorUtilObj(val dataset: String,val proximity: Int, var numJobs: Int, var lastIndex: Int){    
-  } 
+  }
+  
+  //This generator will populate the queues, It creates numBatches batches, where each Batch contains NumQueriesPerBatch
+  //percShared is the percentage of queries in the batch will be sharing the dataset in each batch
+  def generateWorkloadBatch(cachePlanner: Planner, numBatches: Int, numQueriesPerBatch: Int, percShared: Double) {
+    val numDistinctDatasets: Int = 80
+    val datasets = new ArrayBuffer[String]
+    var dIndex: Int = 0
+    while (dIndex < numDistinctDatasets/*/2*/) {
+      datasets += ("/tpch"+((dIndex%(numDistinctDatasets/2))+1)+"/orders")
+      dIndex = dIndex + 1
+    }
+    
+    val random = new Random(Platform.currentTime)
+    dIndex = 0
+    val numShared = ((numQueriesPerBatch * cachePlanner.pools.size) * percShared).toInt
+    var index: Int = 0
+    
+    for(batchIndex <- 0 until numBatches) {
+      
+      var bIndex: Int = 0
+      for(count <- 0 until numShared) {
+        val poolsIndex = index % cachePlanner.pools.size //This is to choose which pool
+        val poolIndex = index / cachePlanner.pools.size //This is to choose which element in the pool
+        cachePlanner.addQueryToPool("pool"+(poolsIndex+1),new Query(datasets(dIndex),QueryOperation(random.nextInt(QueryOperation.values.size-1)+1),1,0,"\\|",10))
+        bIndex = bIndex + 1
+        index = index + 1
+      }
+      dIndex = dIndex + 1
+      if(dIndex >= 80) {
+        dIndex = 0
+      }
+      
+      while(bIndex < (numQueriesPerBatch * cachePlanner.pools.size)) {
+        val poolsIndex = index % cachePlanner.pools.size //This is to choose which pool
+        val poolIndex = index / cachePlanner.pools.size //This is to choose which element in the pool
+        cachePlanner.addQueryToPool("pool"+(poolsIndex+1),new Query(datasets(dIndex),QueryOperation(random.nextInt(QueryOperation.values.size-1)+1),1,0,"\\|",10))
+        bIndex = bIndex + 1
+        index = index + 1
+
+        dIndex = dIndex + 1
+        if(dIndex >= 80) {
+          dIndex = 0
+        }        
+      }
+    }
+    
+  }
   
   //This will populate each queue with numQueriesPerQueue queries
   //Assumes that basedatasets are in /tpch*/
@@ -375,6 +434,7 @@ object SparkQueriesPlannerDriver {
     //println("-generate <num queries> <share probability> <period> - Generates a workload (fills the queues) with the given parameter")
     //probShare: Double, maxGap: Int, maxSharedJobs: Int
     println("-generate <num queries> <share probability> <maxGap> <maxSharedJobs> - Generates a workload (fills the queues) with the given parameter")
+    println("-generateBatch <num batches> <batchSize> <percent shared> - Generates a workload (fills the queues) with the given parameter")
     println("-analyze - print analysis stats")
     println("-norun - don't run the workload")
   }
