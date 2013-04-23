@@ -185,8 +185,10 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         //Or we can have N running threads, each responsible for processing each pool
         //If the pools are dependent on a cached dataset, then it waits for that to finish
         var cachePoolName = ""
+        var delim = ""
         for(poolName <- maxDataset._2) {
-           cachePoolName += poolName
+           cachePoolName += delim+poolName
+           delim = "|"
         }
 
         val futures = new ArrayBuffer[Future[_]]
@@ -211,7 +213,18 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           cacheFuture.get
         }
         for(poolName <- maxDataset._2) {
-          val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(poolName),poolName,(maxDataset._1,datasetToRDD(maxDataset._1))))
+          //We re-arrange the queries, to put the queries that uses the cached dataset to the front of the queue
+          val currentPool = poolNameToQueries(poolName)         
+          val cachedQueries = new ArrayBuffer[Query]
+          for(query <- currentPool) {
+            if(query.input == maxDataset._1) {
+              cachedQueries += query
+              currentPool -= query
+            }
+          }
+          currentPool.prependAll(cachedQueries)
+          
+          val future = threadPool.submit(new PoolSubmissionThread(currentPool,poolName,(maxDataset._1,datasetToRDD(maxDataset._1))))
           futures += future
         }
         
@@ -315,8 +328,10 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         //Or we can have N running threads, each responsible for processing each pool
         //If the pools are dependent on a cached dataset, then it waits for that to finish
         var cachePoolName = ""
+        var delim = ""
         for(poolName <- maxDataset._2) {
-           cachePoolName += poolName
+           cachePoolName += delim+poolName
+           delim = "|"
         }
 
         val futures = new ArrayBuffer[Future[_]]
@@ -342,7 +357,18 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         }
        
         for(poolName <- maxDataset._2) {
-          val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(poolName),poolName,null, (maxDataset._1,datasetToPartitionedRDD(maxDataset._1,maxDataset._3),maxDataset._3)))
+          //We re-arrange the queries, to put the queries that uses the cached dataset to the front of the queue
+          val currentPool = poolNameToQueries(poolName)         
+          val cachedQueries = new ArrayBuffer[Query]
+          for(query <- currentPool) {
+            if(query.input == maxDataset._1) {
+              cachedQueries += query
+              currentPool -= query
+            }
+          }
+          currentPool.prependAll(cachedQueries)          
+          
+          val future = threadPool.submit(new PoolSubmissionThread(currentPool,poolName,null, (maxDataset._1,datasetToPartitionedRDD(maxDataset._1,maxDataset._3),maxDataset._3)))
           futures += future
         }
         
@@ -396,7 +422,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           futures += future
         } else {
           val future = threadPool.submit(new QueryToSpark(queries(i), poolName))
-          futures += future          
+         // futures += future          
         }
       }
       for(future <- futures) {
