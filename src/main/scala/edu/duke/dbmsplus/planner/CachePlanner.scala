@@ -52,7 +52,10 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
 
   //Start the planner
   //strat - 1 baseline, no cache optimization
-  //strat - 2 batch head of queues, pick most commonly used dataset
+  //strat - 2 batch with N items of queues, pick most commonly used dataset to cache (Cache dataset as is)
+  //strat - 3 batch with N items of queues, pick most commonly used dataset to cache (Cache dataset as is), reorder queries by pushing queries using cache to the start and only wait for them
+  //strat - 4 batch with N items of queues, pick most commonly used dataset to cache (cache a partitioned version of dataset)
+  //strat - 5 batch with N items of queues, pick most commonly used dataset to cache (cache a partitioned version of dataset), reorder queries by pushing queries using cache to the start and only wait for them
   def start(strat: Int) {
     if(!hasStarted) {
       hasEnded = false
@@ -71,9 +74,15 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         val t = new Thread(startCacheSingle())
         t.start
       } else if(strat == 3) {
+        val t = new Thread(startCacheSingle(true))
+        t.start
+      } else if(strat == 4) {
         val t = new Thread(startCachePartitionedSingle())
         t.start
-      }else { //Strategy not found
+      } else if(strat == 5) {
+        val t = new Thread(startCachePartitionedSingle(true))
+        t.start
+      } else { //Strategy not found
         hasStarted = false
         hasEnded = true
       }
@@ -131,7 +140,8 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
   //It launches a separate thread (PoolSubmissionThread) for each queue that is responsible for submitting queries to spark
   //Within the PoolSubmissionThread, it launches a separate thread for each query submission
   //The algorithm uses a simple heuristic to decide whether to cache a dataset. It finds the dataset that is read by the most number of jobs > minSharedJobs
-  def startCacheSingle() {
+  //boundReorderEnabled, specify whether to push queries that use cached dataet into the start of the queue and then proceed with the next batch after these queries have finished
+  def startCacheSingle(boundedReorderEnabled: Boolean = false) {
     println("Starting Planner with single caching, batch periodicity:"+batchPeriodicity+", max queries per queue in batch:"+maxQueriesPerQueueinBatch)
     val poolNameToQueries  = new HashMap[String, ArrayBuffer[Query]]
     while(!hasEnded) {
@@ -213,18 +223,20 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           cacheFuture.get
         }
         for(poolName <- maxDataset._2) {
-          //We re-arrange the queries, to put the queries that uses the cached dataset to the front of the queue
-          val currentPool = poolNameToQueries(poolName)         
-          val cachedQueries = new ArrayBuffer[Query]
-          for(query <- currentPool) {
-            if(query.input == maxDataset._1) {
-              cachedQueries += query
-              currentPool -= query
-            }
-          }
-          currentPool.prependAll(cachedQueries)
           
-          val future = threadPool.submit(new PoolSubmissionThread(currentPool,poolName,(maxDataset._1,datasetToRDD(maxDataset._1))))
+          val currentPool = poolNameToQueries(poolName)
+          if(boundedReorderEnabled) {
+            //We re-arrange the queries, to put the queries that uses the cached dataset to the front of the queue
+            val cachedQueries = new ArrayBuffer[Query]
+            for(query <- currentPool) {
+              if(query.input == maxDataset._1) {
+                cachedQueries += query
+                currentPool -= query
+              }
+            }
+            currentPool.prependAll(cachedQueries)
+          }
+          val future = threadPool.submit(new PoolSubmissionThread(currentPool,poolName,boundedReorderEnabled,(maxDataset._1,datasetToRDD(maxDataset._1))))
           futures += future
         }
         
@@ -258,7 +270,8 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
   //It launches a separate thread (PoolSubmissionThread) for each queue that is responsible for submitting queries to spark
   //Within the PoolSubmissionThread, it launches a separate thread for each query submission
   //The algorithm uses a simple heuristic to decide whether to cache a dataset. It finds the dataset that is read by the most number of jobs > minSharedJobs
-  def startCachePartitionedSingle() {
+  //boundReorderEnabled, specify whether to push queries that use cached dataet into the start of the queue and then proceed with the next batch after these queries have finished
+  def startCachePartitionedSingle(boundedReorderEnabled: Boolean = false) {
     println("Starting Planner with single caching, batch periodicity:"+batchPeriodicity+", max queries per queue in batch:"+maxQueriesPerQueueinBatch)
     val poolNameToQueries  = new HashMap[String, ArrayBuffer[Query]]
     while(!hasEnded) {
@@ -357,18 +370,19 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         }
        
         for(poolName <- maxDataset._2) {
-          //We re-arrange the queries, to put the queries that uses the cached dataset to the front of the queue
-          val currentPool = poolNameToQueries(poolName)         
-          val cachedQueries = new ArrayBuffer[Query]
-          for(query <- currentPool) {
-            if(query.input == maxDataset._1) {
-              cachedQueries += query
-              currentPool -= query
+          val currentPool = poolNameToQueries(poolName)
+          if(boundedReorderEnabled) {
+            //We re-arrange the queries, to put the queries that uses the cached dataset to the front of the queue
+            val cachedQueries = new ArrayBuffer[Query]
+            for(query <- currentPool) {
+              if(query.input == maxDataset._1) {
+                cachedQueries += query
+                currentPool -= query
+              }
             }
+            currentPool.prependAll(cachedQueries)          
           }
-          currentPool.prependAll(cachedQueries)          
-          
-          val future = threadPool.submit(new PoolSubmissionThread(currentPool,poolName,null, (maxDataset._1,datasetToPartitionedRDD(maxDataset._1,maxDataset._3),maxDataset._3)))
+          val future = threadPool.submit(new PoolSubmissionThread(currentPool,poolName,boundedReorderEnabled, null, (maxDataset._1,datasetToPartitionedRDD(maxDataset._1,maxDataset._3),maxDataset._3)))
           futures += future
         }
         
@@ -398,19 +412,8 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
 
 
   //A Thread that goes through a list of queries and submits it sequentially by launching separate submission threads for each query
-  class PoolSubmissionThread(queries: ArrayBuffer[Query], poolName: String, inputRDDPair: (String,RDD[Array[String]]) = null, inputPartitionedRDDThrice: (String,RDD[(Long,Seq[Array[String]])],Int) = null) extends Runnable {
+  class PoolSubmissionThread(queries: ArrayBuffer[Query], poolName: String, onlyWaitForCached: Boolean = false, inputRDDPair: (String,RDD[Array[String]]) = null, inputPartitionedRDDThrice: (String,RDD[(Long,Seq[Array[String]])],Int) = null) extends Runnable {
     override def run(): Unit = {
-/*      SparkEnv.set(sparkEnv)
-      sc.initLocalProperties
-      sc.addLocalProperties("spark.scheduler.cluster.fair.pool", poolName)
-      for(query <- queries) {
-        if(inputRDDPair != null && query.input == inputRDDPair._1) {
-          queryToSpark(query, poolName, inputRDDPair._2)
-        } else {
-          queryToSpark(query, poolName)
-        }      
-      }
-*/
       val futures = new ArrayBuffer[Future[_]]
      
       for(i <- 0 until queries.size) {
@@ -422,7 +425,8 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           futures += future
         } else {
           val future = threadPool.submit(new QueryToSpark(queries(i), poolName))
-         // futures += future          
+          if(!onlyWaitForCached)
+            futures += future          
         }
       }
       for(future <- futures) {
@@ -433,98 +437,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
     }
   }
 
-  //A Utility method that submits the query to Spark
-  def queryToSpark(query: Query, poolName: String, rdd: RDD[String] = null) {
-    if(rdd == null) { //directly read from HDFS
-      val file = sc.textFile(hdfsMaster+"/"+query.input)
-      if(query.operation == Count) {
-        file.count
-      } else {
-        val separator = query.separator
-        val groupCol = query.groupCol
-        val aggCol = query.aggCol
-        if(query.operation == Sum || query.operation == Min || query.operation == Max) {
-          val mapToKV = file.map(line => {
-            val splits = line.split(separator)
-            (splits(groupCol),splits(aggCol).toDouble) }
-          )
-          if(query.operation == Sum) {
-            val reduceByKey = mapToKV.reduceByKey(_ + _, query.parallelism)
-            sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
-          } else if(query.operation == Max) {
-            val reduceByKey = mapToKV.reduceByKey((a,b) => {max(a,b)},query.parallelism)
-            sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
-          } else if(query.operation == Min) {
-            val reduceByKey = mapToKV.reduceByKey((a,b) => {min(a,b)},query.parallelism)
-            sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
-          }
-        } else {
-          val mapToKV = file.map(line => {
-            val splits = line.split(separator)
-            (splits(groupCol),new Stats(splits(aggCol).toDouble)) }            
-          )
-          if(query.operation == CountByKey) {
-            val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)}, query.parallelism)
-            val countByKey = reduceByKey.map(line => { (line._1,line._2.count)})
-            sc.runJob(countByKey, (iter: Iterator[(String,Long)]) => {})            
-          } else if(query.operation == Mean) {
-            val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)},query.parallelism)
-            val meanByKey = reduceByKey.map(line => { (line._1,line._2.mean)})
-            sc.runJob(meanByKey, (iter: Iterator[(String,Double)]) => {})
-          } else if(query.operation == Variance) {
-            val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)},query.parallelism)
-            val varianceByKey = reduceByKey.map(line => { (line._1,line._2.variance)})
-            sc.runJob(varianceByKey, (iter: Iterator[(String,Double)]) => {})
-          }
-        }
-      }
-    }
-    else {
-      if(query.operation == Count) {
-        rdd.count
-      }
-      else {
-        val separator = query.separator
-        val groupCol = query.groupCol
-        val aggCol = query.aggCol
-        val mapToKV = rdd.map(line => {
-          val splits = line.split(separator)
-          (splits(groupCol),splits(aggCol).toDouble) }
-        )
-        if(query.operation == Sum || query.operation == Min || query.operation == Max) {
-          if(query.operation == Sum) {
-            val reduceByKey = mapToKV.reduceByKey(_ + _, query.parallelism)
-            sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
-          } else if(query.operation == Max) {
-            val reduceByKey = mapToKV.reduceByKey((a,b) => {max(a,b)},query.parallelism)
-            sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
-          } else if(query.operation == Min) {
-            val reduceByKey = mapToKV.reduceByKey((a,b) => {min(a,b)},query.parallelism)
-            sc.runJob(reduceByKey, (iter: Iterator[(String,Double)]) => {})
-          }
-        } else {
-          val mapToKV = rdd.map(line => {
-            val splits = line.split(separator)
-            (splits(groupCol),new Stats(splits(aggCol).toDouble)) }            
-          )
-          if(query.operation == CountByKey) {
-            val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)}, query.parallelism)
-            val countByKey = reduceByKey.map(line => { (line._1,line._2.count)})
-            sc.runJob(countByKey, (iter: Iterator[(String,Long)]) => {})            
-          } else if(query.operation == Mean) {
-            val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)},query.parallelism)
-            val meanByKey = reduceByKey.map(line => { (line._1,line._2.mean)})
-            sc.runJob(meanByKey, (iter: Iterator[(String,Double)]) => {})
-          } else if(query.operation == Variance) {
-            val reduceByKey = mapToKV.reduceByKey((a,b) => {a.merge(b)},query.parallelism)
-            val varianceByKey = reduceByKey.map(line => { (line._1,line._2.variance)})
-            sc.runJob(varianceByKey, (iter: Iterator[(String,Double)]) => {})
-          }
-        }
-      }
-    }
-  }
-  
+   
   //This class is used to submit a query in a separate thread to Spark
   //partitionedRDD is a pair pointing to the RDD itself and the groupCol that the data is partitioned on
   class QueryToSpark(query: Query, poolName: String, rdd: RDD[Array[String]] = null, partitionedRDD: (RDD[(Long,Seq[Array[String]])],Int) = null) extends Runnable {
@@ -576,7 +489,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           }
         }
       }
-      else if (rdd != null) {
+      else if (rdd != null) { //We have a non-partitioned RDD (The RDD is composed of rows of Array of Strings)
         if(query.operation == Count) {
           rdd.count
         } else {
@@ -617,7 +530,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           }
         }        
       }
-      else if (partitionedRDD != null){ // partitioned RDD - The RDD is already partitioned by GroupCol
+      else if (partitionedRDD != null){ // partitioned RDD - The RDD is already partitioned by GroupCol, Key is the groupCol, value is the array of strings
         val cachedRDD = partitionedRDD._1
         val cachedGroupCol = partitionedRDD._2
         if(query.operation == Count) {
