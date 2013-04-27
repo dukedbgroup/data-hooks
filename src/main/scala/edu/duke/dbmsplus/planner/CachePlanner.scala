@@ -96,6 +96,12 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
       threadPool.shutdown
   }
 
+
+  /* ***************************************************************
+   * Methods for different planning strategies 
+   * ***************************************************************
+   */
+  
   //This planning strategy simply submits queries in the queue to spark
   //It uses a separate thread for each query submission
   def startNoCaching() {
@@ -133,7 +139,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
     }
     hasStarted = false
   }
-
+  
   //This strategy performs batch processing. Every batchPeriodicity, it grabs all of the queries in the queues
   //It searches for a possible dataset to cache
   //If found, it submits a separate thread to cache the dataset
@@ -165,28 +171,10 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           threadPool.shutdown
         }
       }
-     
-      //search for all possible cacheable datasets
-      //Traverse all queries, create frequency map for inputs
-      val datasetCount = new HashMap[String, (Int,TreeSet[String])]
-      for(key <- poolNameToQueries.keys) {
-        for(query <- poolNameToQueries(key)) {
-          if(datasetCount.contains(query.input)) {
-            val poolNameSet = datasetCount(query.input)._2 + key
-            datasetCount(query.input) = (datasetCount(query.input)._1+1,poolNameSet)
-          } else {
-            val poolNameSet = TreeSet[String](key)
-            datasetCount(query.input) = (1, poolNameSet)
-          }
-        }
-      }
       
-      //Filters the frequencyMap to entries that satisfies the minSharedJobs constraint
-      //Find the max
-      val filteredDatasetCount = datasetCount.filter(_._2._1 >= minSharedjobs)
-      var maxDataset: (String,TreeSet[String]) = null
-      if(filteredDatasetCount.size > 0)
-        maxDataset = (filteredDatasetCount.maxBy(_._2._1)._1,filteredDatasetCount.maxBy(_._2._1)._2._2)
+      //We find the Dataset to Cache
+      //maxDataset is tuple that contains (Dataset Name, Set of Pools that Use the Dataset)
+      val maxDataset = findDatasetToCache(poolNameToQueries)
         
       //There will be a separate thread launched to process each queue (called PoolSubmissionThread)
       //Within each thread, it launches separate threads for each query in the pool
@@ -296,43 +284,9 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         }
       }
      
-      //search for all possible cacheable datasets
-      //Traverse all queries, create frequency map for inputs
-      //The datasetCount is a HashMap with key = dataset name
-      // The value is a tuple3 containing _1 = # of occurence of dataset, _2 = Set of Pools, _3 = HashMap of groupCol as Key and # occurence as value
-      val datasetCount = new HashMap[String, (Int,TreeSet[String], HashMap[Int,Int])]
-      for(key <- poolNameToQueries.keys) {
-        for(query <- poolNameToQueries(key)) {
-          if(datasetCount.contains(query.input)) {
-            val poolNameSet = datasetCount(query.input)._2 + key
-            val groupKeyMap = datasetCount(query.input)._3
-            if(groupKeyMap.contains(query.groupCol)) {
-              groupKeyMap(query.groupCol) = groupKeyMap(query.groupCol) + 1
-              datasetCount(query.input) = (datasetCount(query.input)._1+1,poolNameSet,groupKeyMap)
-            }
-            else {
-              groupKeyMap(query.groupCol) = 1
-              datasetCount(query.input) = (datasetCount(query.input)._1+1,poolNameSet,groupKeyMap)
-            }
-          } else {
-            val poolNameSet = TreeSet[String](key)
-            val groupKeyMap = new HashMap[Int,Int]
-            groupKeyMap(query.groupCol) = 1 
-            datasetCount(query.input) = (1, poolNameSet, groupKeyMap)
-          }
-        }
-      }
-      
-      //Filters the frequencyMap to entries that satisfies the minSharedJobs constraint
-      val filteredDatasetCount = datasetCount.filter(_._2._1 >= minSharedjobs)
-      //We find the dataset that occurs the most
-      var maxDataset: (String,TreeSet[String],Int) = null
-      if(filteredDatasetCount.size > 0) {
-        val chosenDataset = filteredDatasetCount.maxBy(_._2._1)
-        //We also pick the partitioning on the grouping column that is used by most queries
-        val groupKey = chosenDataset._2._3.maxBy(_._2)._1
-        maxDataset = (chosenDataset._1,chosenDataset._2._2, groupKey)
-      }
+      //We find the Dataset to Cache
+      //maxDataset is tuple3 that contains (Dataset Name, Set of Pools that Use the Dataset, Grouping Column)
+      val maxDataset = findPartitionedDatasetToCache(poolNameToQueries)
         
       //There will be a separate thread launched to process each queue (called PoolSubmissionThread)
       //Within each thread, it launches separate threads for each query in the pool
@@ -409,8 +363,92 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
     hasStarted = false
   }  
   
+  /* ***************************************************************
+   * Methods for different strategies to find Dataset to Cache 
+   * ***************************************************************
+   */
 
+  //This is a Utility function that finds a dataset to cache
+  //This uses a greedy strategy to find the dataset
+  //Given an input queues of queries, if finds the dataset that is read the MOST and read by > minSharedJobs Queries
+  //It returns a tuple: (Dataset Name, Set of Queues that uses the dataset)
+  def findDatasetToCache(poolNameToQueries: HashMap[String, ArrayBuffer[Query]]): (String,TreeSet[String]) = {
+    //search for all possible cacheable datasets
+    //Traverse all queries, create frequency map for inputs
+    val datasetCount = new HashMap[String, (Int,TreeSet[String])]
+    for(key <- poolNameToQueries.keys) {
+      for(query <- poolNameToQueries(key)) {
+        if(datasetCount.contains(query.input)) {
+          val poolNameSet = datasetCount(query.input)._2 + key
+          datasetCount(query.input) = (datasetCount(query.input)._1+1,poolNameSet)
+        } else {
+          val poolNameSet = TreeSet[String](key)
+          datasetCount(query.input) = (1, poolNameSet)
+        }
+      }
+    }
+      
+    //Filters the frequencyMap to entries that satisfies the minSharedJobs constraint
+    //Find the max
+    val filteredDatasetCount = datasetCount.filter(_._2._1 >= minSharedjobs)
+    var maxDataset: (String,TreeSet[String]) = null
+    if(filteredDatasetCount.size > 0)
+      maxDataset = (filteredDatasetCount.maxBy(_._2._1)._1,filteredDatasetCount.maxBy(_._2._1)._2._2)
+    return maxDataset  
+  }
 
+  //This is a Utility function that finds a dataset to cache
+  //This uses a greedy strategy to find the dataset
+  //Given an input queues of queries, if finds the dataset that is read the MOST and read by > minSharedJobs Queries
+  //After finding this dataset, it finds the grouping column that is used by MOST queries
+  //It returns a tuple3: (Dataset Name, Set of Queues that uses the dataset, Grouping Column)
+  def findPartitionedDatasetToCache(poolNameToQueries: HashMap[String, ArrayBuffer[Query]]):  (String,TreeSet[String],Int) = {
+    //search for all possible cacheable datasets
+      //Traverse all queries, create frequency map for inputs
+      //The datasetCount is a HashMap with key = dataset name
+      // The value is a tuple3 containing _1 = # of occurence of dataset, _2 = Set of Pools, _3 = HashMap of groupCol as Key and # occurence as value
+      val datasetCount = new HashMap[String, (Int,TreeSet[String], HashMap[Int,Int])]
+      for(key <- poolNameToQueries.keys) {
+        for(query <- poolNameToQueries(key)) {
+          if(datasetCount.contains(query.input)) {
+            val poolNameSet = datasetCount(query.input)._2 + key
+            val groupKeyMap = datasetCount(query.input)._3
+            if(groupKeyMap.contains(query.groupCol)) {
+              groupKeyMap(query.groupCol) = groupKeyMap(query.groupCol) + 1
+              datasetCount(query.input) = (datasetCount(query.input)._1+1,poolNameSet,groupKeyMap)
+            }
+            else {
+              groupKeyMap(query.groupCol) = 1
+              datasetCount(query.input) = (datasetCount(query.input)._1+1,poolNameSet,groupKeyMap)
+            }
+          } else {
+            val poolNameSet = TreeSet[String](key)
+            val groupKeyMap = new HashMap[Int,Int]
+            groupKeyMap(query.groupCol) = 1 
+            datasetCount(query.input) = (1, poolNameSet, groupKeyMap)
+          }
+        }
+      }
+      
+      //Filters the frequencyMap to entries that satisfies the minSharedJobs constraint
+      val filteredDatasetCount = datasetCount.filter(_._2._1 >= minSharedjobs)
+      //We find the dataset that occurs the most
+      var maxDataset: (String,TreeSet[String],Int) = null
+      if(filteredDatasetCount.size > 0) {
+        val chosenDataset = filteredDatasetCount.maxBy(_._2._1)
+        //We also pick the partitioning on the grouping column that is used by most queries
+        val groupKey = chosenDataset._2._3.maxBy(_._2)._1
+        maxDataset = (chosenDataset._1,chosenDataset._2._2, groupKey)
+      }
+    return maxDataset
+  }
+
+  /* ***************************************************************
+   * Utility Classes and Methods (e.g., submitting queries of queues
+   * converting a query to spark code, A query to cache dataset)  
+   * ***************************************************************
+   */
+  
   //A Thread that goes through a list of queries and submits it sequentially by launching separate submission threads for each query
   class PoolSubmissionThread(queries: ArrayBuffer[Query], poolName: String, onlyWaitForCached: Boolean = false, inputRDDPair: (String,RDD[Array[String]]) = null, inputPartitionedRDDThrice: (String,RDD[(Long,Seq[Array[String]])],Int) = null) extends Runnable {
     override def run(): Unit = {
