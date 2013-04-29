@@ -152,6 +152,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
     val poolNameToQueries  = new HashMap[String, ArrayBuffer[Query]]
     while(!hasEnded) {
       //Grab the elements of queues
+      var isLast = true
       pools.synchronized {
         for(key <-poolNameToPool.keys) {
           val pool = poolNameToPool(key)
@@ -170,12 +171,19 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           hasEnded = true
           threadPool.shutdown
         }
+        //Check if this is the last batch
+        //Do we need this? The main program will not exit until all threads has terminated anyways
+        for(key <-poolNameToPool.keys) {
+          if(poolNameToPool(key).queryQueue.size > 0) {
+            isLast = false
+          }
+        }
       }
       
       //We find the Dataset to Cache
       //maxDataset is tuple that contains (Dataset Name, Set of Pools that Use the Dataset)
       val maxDataset = findDatasetToCache(poolNameToQueries)
-        
+      val onlyWaitForCached = boundedReorderEnabled && !isLast    
       //There will be a separate thread launched to process each queue (called PoolSubmissionThread)
       //Within each thread, it launches separate threads for each query in the pool
       if(maxDataset != null) {
@@ -201,7 +209,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         }
         for(key <- poolNameToQueries.keys) {
           if(!maxDataset._2.contains(key)) {
-            val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(key),key))
+            val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(key),key, onlyWaitForCached))
             futures += future
           }
         }
@@ -224,7 +232,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
             }
             currentPool.prependAll(cachedQueries)
           }
-          val future = threadPool.submit(new PoolSubmissionThread(currentPool,poolName,boundedReorderEnabled,(maxDataset._1,datasetToRDD(maxDataset._1))))
+          val future = threadPool.submit(new PoolSubmissionThread(currentPool,poolName,onlyWaitForCached,(maxDataset._1,datasetToRDD(maxDataset._1))))
           futures += future
         }
         
@@ -235,7 +243,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         if(!poolNameToQueries.isEmpty) {
           val futures = new ArrayBuffer[Future[_]]
           for(key <- poolNameToQueries.keys) {
-            val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(key),key))
+            val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(key),key,onlyWaitForCached))
             futures += future
           }
           for(future <- futures) {
@@ -264,6 +272,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
     val poolNameToQueries  = new HashMap[String, ArrayBuffer[Query]]
     while(!hasEnded) {
       //Grab the elements of queues
+      var isLast = true
       pools.synchronized {
         for(key <-poolNameToPool.keys) {
           val pool = poolNameToPool(key)
@@ -282,12 +291,20 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           hasEnded = true
           threadPool.shutdown
         }
+        //Check if this is the last batch
+        //Do we need this? The main program will not exit until all threads has terminated anyways
+        for(key <-poolNameToPool.keys) {
+          if(poolNameToPool(key).queryQueue.size > 0) {
+            isLast = false
+          }
+        }
+        
       }
      
       //We find the Dataset to Cache
       //maxDataset is tuple3 that contains (Dataset Name, Set of Pools that Use the Dataset, Grouping Column)
       val maxDataset = findPartitionedDatasetToCache(poolNameToQueries)
-        
+      val onlyWaitForCached = boundedReorderEnabled && !isLast   
       //There will be a separate thread launched to process each queue (called PoolSubmissionThread)
       //Within each thread, it launches separate threads for each query in the pool
       if(maxDataset != null) {
@@ -313,7 +330,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         }
         for(key <- poolNameToQueries.keys) {
           if(!maxDataset._2.contains(key)) {
-            val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(key),key))
+            val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(key),key), onlyWaitForCached)
             futures += future
           }
         }
@@ -328,15 +345,17 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
           if(boundedReorderEnabled) {
             //We re-arrange the queries, to put the queries that uses the cached dataset to the front of the queue
             val cachedQueries = new ArrayBuffer[Query]
-            for(query <- currentPool) {
+            for(query <- currentPool) {          
               if(query.input == maxDataset._1) {
-                cachedQueries += query
-                currentPool -= query
+                cachedQueries += query                
               }
+            }
+            for(query <- cachedQueries) {
+              currentPool -= query
             }
             currentPool.prependAll(cachedQueries)          
           }
-          val future = threadPool.submit(new PoolSubmissionThread(currentPool,poolName,boundedReorderEnabled, null, (maxDataset._1,datasetToPartitionedRDD(maxDataset._1,maxDataset._3),maxDataset._3)))
+          val future = threadPool.submit(new PoolSubmissionThread(currentPool,poolName,onlyWaitForCached, null, (maxDataset._1,datasetToPartitionedRDD(maxDataset._1,maxDataset._3),maxDataset._3)))
           futures += future
         }
         
@@ -347,7 +366,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
         if(!poolNameToQueries.isEmpty) {
           val futures = new ArrayBuffer[Future[_]]
           for(key <- poolNameToQueries.keys) {
-            val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(key),key))
+            val future = threadPool.submit(new PoolSubmissionThread(poolNameToQueries(key),key), onlyWaitForCached)
             futures += future
           }
           for(future <- futures) {
