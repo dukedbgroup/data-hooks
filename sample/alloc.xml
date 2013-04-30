@@ -12,40 +12,4 @@
   <pool name="pool4">
      <weight>25</weight>
   </pool>
-  <pool name="pool1pool2">
-     <weight>50</weight>
-  </pool>
-  <pool name="pool1pool3">
-     <weight>50</weight>
-  </pool>
-  <pool name="pool1pool4">
-     <weight>50</weight>
-  </pool>
-  <pool name="pool2pool3">
-     <weight>50</weight>
-  </pool>
-  <pool name="pool2pool4">
-     <weight>50</weight>
-  </pool>
-  <pool name="pool3pool4">
-     <weight>50</weight>
-  </pool>
-  <pool name="pool1pool2pool3">
-     <weight>75</weight>
-  </pool>
-  <pool name="pool1pool2pool4">
-     <weight>75</weight>
-  </pool>
-  <pool name="pool1pool3pool4">
-     <weight>75</weight>
-  </pool>
-  <pool name="pool2pool3pool4">
-     <weight>75</weight>
-  </pool>
-  <pool name="pool1pool2pool3pool4">
-     <weight>100</weight>
-  </pool>
-  <pool name="default">
-     <weight>25</weight>
-  </pool>
 </allocations>
