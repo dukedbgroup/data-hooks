@@ -30,6 +30,9 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
   //Cached RDDs
   val datasetToRDD  = new HashMap[String, RDD[Array[String]]]
   val datasetToPartitionedRDD  = new HashMap[(String,Int), RDD[(Long,Seq[Array[String]])]]
+  
+  //The policy to use when storing dataset to memory (i.e., serialized or not serialized, or spill to disk)
+  var cacheStoragePolicy: String = "MEMORY_ONLY"
 
   var hasEnded = false
   var hasStarted = false
@@ -46,7 +49,7 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
   var threadPool: ExecutorService = null
   
   //A toggle where to simply exit the thread when we have exhausted all of the queries in the queue 
-  var exitWhenEmpty: Boolean = true
+  var exitWhenEmpty: Boolean = true    
 
   implicit def whateverToRunnable[F](f: => F) = new Runnable() { def run() { f } }
 
@@ -720,7 +723,16 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
 
       sc.initLocalProperties
       sc.addLocalProperties("spark.scheduler.cluster.fair.pool", poolName)
-      mapToArray.persist(spark.storage.StorageLevel.MEMORY_ONLY)
+      
+      if(cacheStoragePolicy == "MEMORY_ONLY")
+        mapToArray.persist(spark.storage.StorageLevel.MEMORY_ONLY)
+      else if(cacheStoragePolicy == "MEMORY_ONLY_SER")
+        mapToArray.persist(spark.storage.StorageLevel.MEMORY_ONLY_SER)
+      else if(cacheStoragePolicy == "MEMORY_AND_DISK")
+        mapToArray.persist(spark.storage.StorageLevel.MEMORY_AND_DISK)
+      else if(cacheStoragePolicy == "MEMORY_AND_DISK_SER")
+        mapToArray.persist(spark.storage.StorageLevel.MEMORY_AND_DISK_SER)
+        
       sc.runJob(mapToArray, (iter: Iterator[Array[String]]) => {})
       datasetToRDD.synchronized {
           datasetToRDD(dataset) = mapToArray
@@ -747,7 +759,15 @@ class CachePlanner(programName: String, sparkMaster: String, hdfsMaster: String)
 
       sc.initLocalProperties
       sc.addLocalProperties("spark.scheduler.cluster.fair.pool", poolName)
-      partitionedDataset.persist(spark.storage.StorageLevel.MEMORY_ONLY)
+      if(cacheStoragePolicy == "MEMORY_ONLY")
+        partitionedDataset.persist(spark.storage.StorageLevel.MEMORY_ONLY)
+      else if(cacheStoragePolicy == "MEMORY_ONLY_SER")
+        partitionedDataset.persist(spark.storage.StorageLevel.MEMORY_ONLY_SER)
+      else if(cacheStoragePolicy == "MEMORY_AND_DISK")
+        partitionedDataset.persist(spark.storage.StorageLevel.MEMORY_AND_DISK)
+      else if(cacheStoragePolicy == "MEMORY_AND_DISK_SER")
+        partitionedDataset.persist(spark.storage.StorageLevel.MEMORY_AND_DISK_SER)
+        
       sc.runJob(partitionedDataset, (iter: Iterator[(Long,Seq[Array[String]])]) => {})
       datasetToPartitionedRDD.synchronized {
           datasetToPartitionedRDD((dataset,groupCol)) = partitionedDataset

@@ -43,6 +43,7 @@ object SparkQueriesPlannerDriver {
     var programName: String = "Spark Queries Planner"
     var doAnalyze: Boolean = false
     var boundedReorder: Boolean = false
+    var cacheStoragePolicy: String = "MEMORY_ONLY"
     while (i < args.length) {
       if(args(i) == "-s") {
         sparkAddress = args(i+1)
@@ -86,7 +87,10 @@ object SparkQueriesPlannerDriver {
         generateShareProb = args(i+3).toDouble
         i = i + 4
         //"-generate2 <num batches> <batchSize> <share probability> - Generates a workload (fills the queues) with the given parameter"        
-      } else if (args(i) == "-norun") {
+      } else if(args(i) == "-cacheStoragePolicy") {        
+        cacheStoragePolicy = args(i+1)        
+        i = i + 1        
+      }else if (args(i) == "-norun") {
         norun = true
       } else if (args(i) == "-n") {
         programName = args(i+1)
@@ -112,6 +116,7 @@ object SparkQueriesPlannerDriver {
         planner.asInstanceOf[CachePlanner].batchPeriodicity = batchPeriodicity
         planner.asInstanceOf[CachePlanner].maxQueriesPerQueueinBatch = queriesPerQueue
         planner.asInstanceOf[CachePlanner].minSharedjobs = minSharedJobs
+        planner.asInstanceOf[CachePlanner].cacheStoragePolicy = cacheStoragePolicy
       } else {
         planner = new CachePlannerAnalyzer
         planner.asInstanceOf[CachePlannerAnalyzer].batchPeriodicity = batchPeriodicity
@@ -438,6 +443,7 @@ object SparkQueriesPlannerDriver {
     println("optional parameters:")
     println("-n <name or ID of Program (Default: Spark Queries Planner>")
     println("-c <nocache (default) | cache | cachePartitioned> - The planner strategy to use")
+    println("-cacheStoragePolicy <MEMORY_ONLY (default) | MEMORY_ONLY_SER >")
     println("-reorder <false (default) | true > - Whether to re-order the queries that use cached dataset to the front")
     println("-p <periodicity (default 0)> - The periodicity to check the queue")
     println("-q <queries per queue in batch (default -1) > - The number of queries in each queue to look ahead")
