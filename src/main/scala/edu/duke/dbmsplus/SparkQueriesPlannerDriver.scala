@@ -112,6 +112,9 @@ object SparkQueriesPlannerDriver {
     } else {
       var planner: Planner = null
       if(!doAnalyze) {
+        //For now, we set to always use KryoSerializer and RDD compression
+        System.setProperty("spark.serializer", "spark.KryoSerializer")
+        System.setProperty("spark.rdd.compress", "true")
         planner = new CachePlanner(programName, sparkAddress, hdfsAddress)
         planner.asInstanceOf[CachePlanner].batchPeriodicity = batchPeriodicity
         planner.asInstanceOf[CachePlanner].maxQueriesPerQueueinBatch = queriesPerQueue
