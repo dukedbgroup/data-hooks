@@ -9,7 +9,7 @@ object DataHooksBuild extends Build {
 
  def sharedSettings = Defaults.defaultSettings ++ Seq(
    version := "0.1",
-   scalaVersion := "2.9.3",
+   scalaVersion := "2.10.3",
    scalacOptions := Seq("-unchecked", "-optimize", "-deprecation"),
    unmanagedJars in Compile <<= baseDirectory map { base => (base / "lib" ** "*.jar").classpath },
    
