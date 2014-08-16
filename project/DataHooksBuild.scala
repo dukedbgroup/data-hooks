@@ -5,6 +5,15 @@ import AssemblyKeys._
 
 object DataHooksBuild extends Build {
 
+ // Hadoop version to build against.
+ val HADOOP_VERSION = "1.2.1"
+
+ // Spark version to build againt.
+ val SPARK_VERSION = "1.0.1"
+
+ // Hive version
+ val HIVE_VERSION = "0.12.0"
+
  lazy val root = Project(id = "DataHooks", base = file("."), settings = rootSettings) 
 
  def sharedSettings = Defaults.defaultSettings ++ Seq(
@@ -22,9 +31,24 @@ object DataHooksBuild extends Build {
    )
  )
 
- def rootSettings = sharedSettings ++ Seq(
+ def rootSettings = assemblySettings ++ sharedSettings ++ Seq(
+  name := "datahooks",
+  libraryDependencies ++= Seq(
+      "org.antlr" % "antlr-runtime" % "3.4" % "provided",
+      "log4j" % "log4j" % "1.2.16" % "provided",
+      "commons-logging" % "commons-logging" % "1.1.1" % "provided",
+      "com.fasterxml.jackson.core" % "jackson-core" % "2.3.3" % "provided",
+      "com.fasterxml.jackson.core" % "jackson-annotations" % "2.3.3" % "provided",
+      "com.fasterxml.jackson.core" % "jackson-databind" % "2.3.3" % "provided",
+      "junit" % "junit" % "4.11" % "provided",
+      "mysql" % "mysql-connector-java" % "5.1.26",
+      "org.apache.spark" % "spark-core_2.10" % SPARK_VERSION % "provided",
+      "org.apache.hadoop" % "hadoop-core" % HADOOP_VERSION % "provided",
+      "org.apache.hive" % "hive-exec" % HIVE_VERSION % "provided",
+      "org.apache.hive" % "hive-metastore" % HIVE_VERSION % "provided"
+  ),
   publish := {}
- )
+ ) ++ extraAssemblySettings
 
  def extraAssemblySettings() = Seq(test in assembly := {}) ++ Seq(
     mergeStrategy in assembly := {

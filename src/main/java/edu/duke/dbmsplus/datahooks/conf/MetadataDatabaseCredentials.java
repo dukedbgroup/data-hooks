@@ -6,8 +6,9 @@ package edu.duke.dbmsplus.datahooks.conf;
  *
  */
 public class MetadataDatabaseCredentials {
-	public static String CONNECTION_STRING = "jdbc:mysql://inw-5.rfiserve.net:3307/query_analysis3";
-	public static String USERNAME = "mkunjir";
+	public static String DB_NAME = "thoth";
+	public static String CONNECTION_STRING = "jdbc:mysql://localhost:3306/" + DB_NAME;
+	public static String USERNAME = "root";
 	public static String PASSWORD = "database";	
 
 //	public static String CONNECTION_STRING = "jdbc:mysql://127.0.0.1:3306/query_analysis";

@@ -9,9 +9,9 @@ import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
 
-import edu.duke.dbmsplus.datahooks.Connection.JDBCConnector;
 import edu.duke.dbmsplus.datahooks.conf.MetadataDatabaseCredentials;
 import edu.duke.dbmsplus.datahooks.conf.QueryMetadataTables;
+import edu.duke.dbmsplus.datahooks.connection.JDBCConnector;
 
 /**
  * FIXME: This class has to be in same package as all query metadata objects. 
@@ -25,10 +25,10 @@ public class QueryMetadataWriter {
 	Statement stmt = null;
 	//FIXME: Remove this after testing. For testing parsing without writing to db, use "No write". 
 	//Any other value would write to db.
-	String mode = "write";
+	static final String MODE = "write";
 
 	public QueryMetadataWriter() {
-		if("No write".equals(mode)) {
+		if("No write".equals(MODE)) {
 			return;
 		}
 		// set up MySQL database connection
@@ -38,7 +38,21 @@ public class QueryMetadataWriter {
 				MetadataDatabaseCredentials.PASSWORD);
 		try {
 			stmt = dbConnection.createStatement();
+			createDatabase();
 		} catch(SQLException e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Create a database for metadata if not exists
+	 */
+	private void createDatabase() {
+		String create = "CREATE DATABASE IF NOT EXISTS " + MetadataDatabaseCredentials.DB_NAME;
+		try {
+			stmt.execute(create);
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -48,7 +62,7 @@ public class QueryMetadataWriter {
 	 * @param query
 	 */
 	public void addQuery(Query query) {
-//		System.out.println("Adding query: " + query.getQueryString());
+		System.out.println("Adding query: " + query.getQueryString());
 		addToTable(query, QueryMetadataTables.QUERY_TABLE);
 	}
 
@@ -105,8 +119,8 @@ public class QueryMetadataWriter {
 	 * @param row
 	 * @param tabName
 	 */
-	private void addToTable(Object row, String tabName) {
-		if("No write".equals(mode)) {
+	private synchronized void addToTable(Object row, String tabName) {
+		if("No write".equals(MODE)) {
 			return;
 		}
 		StringBuffer sb = new StringBuffer();
@@ -180,7 +194,7 @@ public class QueryMetadataWriter {
 	 * @return
 	 */
 	public synchronized Long fetchLastQueryId() {
-		if("No write".equals(mode)) {
+		if("No write".equals(MODE)) {
 			return 0L;
 		}
 		StringBuffer sb = new StringBuffer();

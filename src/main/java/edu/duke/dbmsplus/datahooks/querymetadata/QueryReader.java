@@ -13,9 +13,9 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang.StringUtils;
 
-import edu.duke.dbmsplus.datahooks.Connection.JDBCConnector;
 import edu.duke.dbmsplus.datahooks.conf.HiveServerCredentials;
 import edu.duke.dbmsplus.datahooks.conf.StarfishDatabaseCredentials;
+import edu.duke.dbmsplus.datahooks.connection.JDBCConnector;
 import edu.duke.dbmsplus.datahooks.semantic.Hook;
 
 /**
