@@ -41,21 +41,7 @@ public class ProfileDataWriter {
 				MetadataDatabaseCredentials.PASSWORD);
 		try {
 			stmt = dbConnection.createStatement();
-			createDatabase();
 		} catch(SQLException e) {
-			e.printStackTrace();
-		}
-	}
-
-	/**
-	 * Create a database for metadata if not exists
-	 */
-	private void createDatabase() {
-		String create = "CREATE DATABASE IF NOT EXISTS " + MetadataDatabaseCredentials.DB_NAME;
-		try {
-			stmt.execute(create);
-		} catch (SQLException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -85,6 +71,16 @@ public class ProfileDataWriter {
 	public void addQuery(Query query) {
 		System.out.println("Adding query: " + query.getQueryString());
 		addToTable(query, ProfileTables.QUERY_TABLE);
+	}
+
+	public void addSparkStage(SparkStage stage) {
+		System.out.println("Adding stage: " + stage.getStageId());
+		addToTable(stage, ProfileTables.SPARK_STAGES_TABLE);
+	}
+
+	public void addHiveStage(HiveStage stage) {
+		System.out.println("Adding stage: " + stage.getStageId());
+		addToTable(stage, ProfileTables.HIVE_STAGES_TABLE);
 	}
 
 	/**

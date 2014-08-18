@@ -6,8 +6,8 @@ package edu.duke.dbmsplus.datahooks.conf;
  *
  */
 public class HiveServerCredentials {
-	public static String CONNECTION_STRING = "jdbc:hive://localhost:10000/default";
-	public static String USERNAME = "";
-	public static String PASSWORD = "";
+	public static volatile String CONNECTION_STRING = "jdbc:hive://localhost:10000/default";
+	public static volatile String USERNAME = "";
+	public static volatile String PASSWORD = "";
 
 }

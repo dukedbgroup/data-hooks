@@ -1038,48 +1038,58 @@ public class HookUtils {
                                         int retCode, boolean isPreliminary, String comments)
                  throws IOException, URISyntaxException {
 
-        HiveQueryInfo hiveQueryInfo = null;
-        try {
-            hiveQueryInfo = HookUtils.buildHiveQueryInfo(hookContext, isPreliminary);
-         hiveQueryInfo.setComments(comments);
-        } catch (Throwable e) {
-            HookUtils.errorMessage("ERROR: HivePostHook.collectQueryInfo()_1: " + e + " " +
-                                                 org.apache.hadoop.util.StringUtils.stringifyException(e));
-        }
+    	HiveQueryInfo hiveQueryInfo = collectQueryInfoToObject(hookContext, 
+    			throwable, tid, jid, taskKind, retCode, isPreliminary, comments);
 
-         // if error occurred, then set corresponding fields
-         if (hiveQueryInfo != null  &&  retCode != 0) {
-             if (throwable != null) { // Hive +0.12 reports this sometimes
-                 ArrayList<String> stackFramesWithCausedBy = new ArrayList<String>(50);
-                 addFramesRecursively(stackFramesWithCausedBy, throwable);
-                 hiveQueryInfo.setFailExStack(stackFramesWithCausedBy.toArray(EMPTY_STRING_ARRAY));
-             }
-             // set error fields
-             hiveQueryInfo.setFailTID(tid);
-             hiveQueryInfo.setFailJID(jid);
-             hiveQueryInfo.setFailTaskKind(taskKind);
-             hiveQueryInfo.setFailRetCode(retCode);
-         }
-
-         // serialize it to json in a file
-         HookUtils.dumpQueryPlanJson(hiveQueryInfo, hookContext.getConf(), isPreliminary);
+    	// serialize it to json in a file
+    	HookUtils.dumpQueryPlanJson(hiveQueryInfo, hookContext.getConf(), isPreliminary);
 
 
-        if (! isPreliminary) {
-            String resultDirPath = getHiveResultDir(hookContext.getConf());
-            HiveLogLayoutManager logLayoutManager = new HiveLogLayoutManager(
-            				resultDirPath);
-            // transition info in hdfs to hdfs dir indicating files are complete
-            logLayoutManager.stateChange(hookContext.getQueryPlan().getQueryId(),
-                                          hookContext.getConf(),
-                                          HiveLogLayoutManager.State.EXECUTING,
-                                          HiveLogLayoutManager.State.COMPLETED);
-        }
-         // cleanup
-         HookUtils.cleanupQueryInfo(hiveQueryInfo);
+    	if (! isPreliminary) {
+    		String resultDirPath = getHiveResultDir(hookContext.getConf());
+    		HiveLogLayoutManager logLayoutManager = new HiveLogLayoutManager(
+    				resultDirPath);
+    		// transition info in hdfs to hdfs dir indicating files are complete
+    		logLayoutManager.stateChange(hookContext.getQueryPlan().getQueryId(),
+    				hookContext.getConf(),
+    				HiveLogLayoutManager.State.EXECUTING,
+    				HiveLogLayoutManager.State.COMPLETED);
+    	}
+    	// cleanup
+    	HookUtils.cleanupQueryInfo(hiveQueryInfo);
      }
 
-     private static void addFramesRecursively(ArrayList<String> stackFramesWithCausedBy, Throwable throwable) {
+    public static HiveQueryInfo collectQueryInfoToObject(HookContext hookContext, 
+    		Throwable throwable, String tid, String jid, String taskKind,
+    		int retCode, boolean isPreliminary, String comments) 
+    				throws IOException, URISyntaxException {
+    	HiveQueryInfo hiveQueryInfo = null;
+    	try {
+    		hiveQueryInfo = HookUtils.buildHiveQueryInfo(hookContext, isPreliminary);
+    		hiveQueryInfo.setComments(comments);
+    	} catch (Throwable e) {
+    		HookUtils.errorMessage("ERROR: HivePostHook.collectQueryInfo()_1: " + e + " " +
+    				org.apache.hadoop.util.StringUtils.stringifyException(e));
+    	}
+
+    	// if error occurred, then set corresponding fields
+    	if (hiveQueryInfo != null  &&  retCode != 0) {
+    		if (throwable != null) { // Hive +0.12 reports this sometimes
+    			ArrayList<String> stackFramesWithCausedBy = new ArrayList<String>(50);
+    			addFramesRecursively(stackFramesWithCausedBy, throwable);
+    			hiveQueryInfo.setFailExStack(stackFramesWithCausedBy.toArray(EMPTY_STRING_ARRAY));
+    		}
+    		// set error fields
+    		hiveQueryInfo.setFailTID(tid);
+    		hiveQueryInfo.setFailJID(jid);
+    		hiveQueryInfo.setFailTaskKind(taskKind);
+    		hiveQueryInfo.setFailRetCode(retCode);
+    	}
+    	return hiveQueryInfo;
+    	
+    }
+
+    	private static void addFramesRecursively(ArrayList<String> stackFramesWithCausedBy, Throwable throwable) {
          StackTraceElement[] stackTrace = throwable.getStackTrace();
          stackFramesWithCausedBy.add("Caused By: " + throwable.getClass().getSimpleName() + ", " + throwable + " (" + throwable.getMessage() + ")");
          for (StackTraceElement ste : stackTrace) {

@@ -6,12 +6,17 @@ package edu.duke.dbmsplus.datahooks.conf;
  *
  */
 public class MetadataDatabaseCredentials {
-	public static String DB_NAME = "thoth";
-	public static String CONNECTION_STRING = "jdbc:mysql://localhost:3306/" + DB_NAME;
-	public static String USERNAME = "root";
-	public static String PASSWORD = "database";	
 
-//	public static String CONNECTION_STRING = "jdbc:mysql://127.0.0.1:3306/query_analysis";
-//	public static String USERNAME = "root";
-//	public static String PASSWORD = "database";	
+	/**
+	 * use these keys to set hive configuration parameters which would then 
+	 * be accessed by hooks
+	 */
+	public static final String CONNECTION_STRING_KEY = "thoth.metadatadb.connection";
+	public static final String USERNAME_KEY = "thoth.metadatadb.username";
+	public static final String PASSWORD_KEY = "thoth.metadatadb.password";
+
+	public static volatile String CONNECTION_STRING = "jdbc:mysql://localhost:3306/";
+	public static volatile String USERNAME = "root";
+	public static volatile String PASSWORD = "database";	
+
 }

@@ -8,6 +8,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.spark.scheduler.SparkListener;
+
 import bigframe.workflows.events.BigFrameListener;
 import bigframe.workflows.events.ComponentCompletedEvent;
 import bigframe.workflows.events.ComponentStartedEvent;
@@ -16,7 +18,9 @@ import bigframe.workflows.events.QueryStartedEvent;
 import bigframe.workflows.events.WorkflowCompletedEvent;
 import bigframe.workflows.events.WorkflowStartedEvent;
 import edu.duke.dbmsplus.datahooks.conf.HiveServerCredentials;
+import edu.duke.dbmsplus.datahooks.conf.MetadataDatabaseCredentials;
 import edu.duke.dbmsplus.datahooks.connection.JDBCConnector;
+import edu.duke.dbmsplus.datahooks.execution.SparkExecListener;
 import edu.duke.dbmsplus.datahooks.execution.profile.Component;
 import edu.duke.dbmsplus.datahooks.execution.profile.ProfileDataWriter;
 import edu.duke.dbmsplus.datahooks.execution.profile.Query;
@@ -61,6 +65,17 @@ public class BigFrameListenerImpl implements BigFrameListener {
 				HiveServerCredentials.PASSWORD);
 		try {
 			hiveStmt = hiveConnection.createStatement();
+			// set up metadata database configuration
+			hiveStmt.execute("set " 
+			+ MetadataDatabaseCredentials.CONNECTION_STRING_KEY + "=" 
+			+ MetadataDatabaseCredentials.CONNECTION_STRING);
+			hiveStmt.execute("set " 
+			+ MetadataDatabaseCredentials.USERNAME_KEY + "=" 
+			+ MetadataDatabaseCredentials.USERNAME);
+			hiveStmt.execute("set " 
+			+ MetadataDatabaseCredentials.PASSWORD_KEY + "=" 
+			+ MetadataDatabaseCredentials.PASSWORD);
+			// hooks
 			hiveStmt.execute("add jar " + jarPath);
 			hiveStmt.execute("set hive.exec.driver.run.hooks=" + Hook.class.getName());
 			hiveStmt.execute("set hive.semantic.analyzer.hook=" + Hook.class.getName());
@@ -91,7 +106,6 @@ public class BigFrameListenerImpl implements BigFrameListener {
 		String explainQuery = "EXPLAIN " + query;
 		try {
 			//			runQueryInClient(explainQuery);
-			System.out.println("** Firing Hive query: " + explainQuery);
 			hiveStmt.execute(explainQuery);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -231,5 +245,22 @@ public class BigFrameListenerImpl implements BigFrameListener {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * Initialize a new {@code SparkExecListener} and return it
+	 * @return
+	 */
+	public SparkListener getSparkListener() {
+		return new SparkExecListener(this, writer);
+	}
+
+	/**
+	 * Requested by Spark and Hive hooks while logging details of 
+	 * stages or jobs respectively
+	 * @return an array of (workflowID, componentID, queryID)
+	 */
+	public Long[] getQueryIdentifier() {
+		return new Long[]{workflowId.get(), componentId.get(), queryId.get()};
 	}
 }

@@ -3,43 +3,79 @@
  */
 package edu.duke.dbmsplus.datahooks.execution
 
+import java.lang.Override
+
 import org.apache.spark.scheduler.SparkListener
-import org.apache.spark.scheduler.SparkListenerStageCompleted
-import org.apache.spark.scheduler.SparkListenerStageSubmitted
-import org.apache.spark.scheduler.SparkListenerTaskStart
-import org.apache.spark.scheduler.SparkListenerTaskGettingResult
-import org.apache.spark.scheduler.SparkListenerTaskEnd
-import org.apache.spark.scheduler.SparkListenerJobStart
-import org.apache.spark.scheduler.SparkListenerJobEnd
-import org.apache.spark.scheduler.SparkListenerEnvironmentUpdate
+import org.apache.spark.scheduler.SparkListenerApplicationEnd
+import org.apache.spark.scheduler.SparkListenerApplicationStart
 import org.apache.spark.scheduler.SparkListenerBlockManagerAdded
 import org.apache.spark.scheduler.SparkListenerBlockManagerRemoved
+import org.apache.spark.scheduler.SparkListenerEnvironmentUpdate
+import org.apache.spark.scheduler.SparkListenerJobEnd
+import org.apache.spark.scheduler.SparkListenerJobStart
+import org.apache.spark.scheduler.SparkListenerStageCompleted
+import org.apache.spark.scheduler.SparkListenerStageSubmitted
+import org.apache.spark.scheduler.SparkListenerTaskEnd
+import org.apache.spark.scheduler.SparkListenerTaskGettingResult
+import org.apache.spark.scheduler.SparkListenerTaskStart
 import org.apache.spark.scheduler.SparkListenerUnpersistRDD
-import org.apache.spark.scheduler.SparkListenerApplicationStart
-import org.apache.spark.scheduler.SparkListenerApplicationEnd
+
+import edu.duke.dbmsplus.datahooks.execution.profile.ProfileDataWriter
+import edu.duke.dbmsplus.datahooks.execution.profile.SparkStage
+import edu.duke.dbmsplus.datahooks.listener.BigFrameListenerImpl
 
 /**
+ * Initialized with 
+ * 1. an instance of {@code BigFrameListener} which is 
+ * used to extract query identifier before logging details of a stage
+ * 2. an instance of {@code ProfileDataWriter} which is 
+ * used to log stage details
  * @author mayuresh
  *
  */
-class SparkExecListener extends SparkListener {
+class SparkExecListener(bflistener: BigFrameListenerImpl, 
+    writer: ProfileDataWriter) extends SparkListener {
+
+  var stageToJob = collection.mutable.Map[Int, Int]()
 
   @Override
   override def onStageCompleted(event: SparkListenerStageCompleted): Unit = {
-    val stage = event.stageInfo
-    // stage details
-    stage.completionTime
-    stage.numTasks
-    stage.name
-    stage.submissionTime
-    stage.stageId
-    // extract jobId
+    val stage = new SparkStage()
+
+    // query identifier
+    val queryId = bflistener.getQueryIdentifier()
+    stage.setWid(queryId(0))
+    stage.setCid(queryId(1))
+    stage.setQid(queryId(2))
     
-    // rdd details can be obtained here    
-    val rdds = stage.rddInfos
-    for(rdd <- rdds) {
-      rdd
-    }    
+    // stage execution details
+    val stageId = event.stageInfo.stageId
+    stage.setStageId(stageId)
+    stage.setName(event.stageInfo.name)
+    stage.setNumTasks(event.stageInfo.numTasks)
+    stage.setSubmissionTime(event.stageInfo.submissionTime match {
+      case Some(time) => time 
+      case None => 0L})
+    stage.setCompletionTime(event.stageInfo.completionTime match {
+      case Some(time) => time
+      case None => 0L})
+    // extract jobId
+    try {
+    	stage.setJobId(stageToJob(stageId))
+    } catch{
+    case e: Exception => stage.setJobId(-1)
+    }
+
+    // write the stage
+    writer.addSparkStage(stage)
+    
+    // TODO: rdd details can be obtained here including the number of bytes shuffled  
+//    val rdds = event.stageInfo.rddInfos
+//    for(rdd <- rdds) {
+//      rdd.id
+//    }    
+    
+    // TODO: failed task details
   }
 
   @Override
@@ -56,11 +92,10 @@ class SparkExecListener extends SparkListener {
 
   @Override
   override def onJobStart(event: SparkListenerJobStart): Unit = {
-    event.jobId
-    event.stageIds
     // keep a map of stageId to jobId
-    
-    // map job to query
+    for(stageId <- event.stageIds) {
+      stageToJob += (stageId -> event.jobId)
+    }
   }
 
   @Override

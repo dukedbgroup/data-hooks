@@ -38,21 +38,7 @@ public class QueryMetadataWriter {
 				MetadataDatabaseCredentials.PASSWORD);
 		try {
 			stmt = dbConnection.createStatement();
-			createDatabase();
 		} catch(SQLException e) {
-			e.printStackTrace();
-		}
-	}
-
-	/**
-	 * Create a database for metadata if not exists
-	 */
-	private void createDatabase() {
-		String create = "CREATE DATABASE IF NOT EXISTS " + MetadataDatabaseCredentials.DB_NAME;
-		try {
-			stmt.execute(create);
-		} catch (SQLException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}

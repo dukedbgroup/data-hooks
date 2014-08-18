@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.antlr.runtime.tree.Tree;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.HiveDriverRunHook;
 import org.apache.hadoop.hive.ql.HiveDriverRunHookContext;
 import org.apache.hadoop.hive.ql.exec.Task;
@@ -21,6 +22,7 @@ import org.apache.hadoop.hive.ql.parse.HiveSemanticAnalyzerHook;
 import org.apache.hadoop.hive.ql.parse.HiveSemanticAnalyzerHookContext;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
+import edu.duke.dbmsplus.datahooks.conf.MetadataDatabaseCredentials;
 import edu.duke.dbmsplus.datahooks.querymetadata.Dataset;
 import edu.duke.dbmsplus.datahooks.querymetadata.Filter;
 import edu.duke.dbmsplus.datahooks.querymetadata.GroupingAttribute;
@@ -42,8 +44,8 @@ public class Hook implements HiveSemanticAnalyzerHook, HiveDriverRunHook {
 	private Map<String, String> tabRefToName = new HashMap<String, String>();
 	private List<String> unRefTables = new ArrayList<String>();
 
-	static QueryMetadataWriter WRITER = null;
-	static AtomicLong COUNTER = null;
+	static volatile QueryMetadataWriter WRITER = null;
+	static volatile AtomicLong COUNTER = null;
 	static List<String> OPERATORS = new ArrayList<String>();	
 	static {
 		OPERATORS.add("=");
@@ -429,6 +431,21 @@ public class Hook implements HiveSemanticAnalyzerHook, HiveDriverRunHook {
 	public synchronized void preDriverRun(HiveDriverRunHookContext runContext) throws Exception {
 		if(WRITER == null) {
 			// first execution
+			// extract metadata db config from Hive config
+			Configuration conf = runContext.getConf();
+			System.out.println("--- Reading from hadoop conf ---");
+			try {
+				MetadataDatabaseCredentials.CONNECTION_STRING = conf.get(
+						MetadataDatabaseCredentials.CONNECTION_STRING_KEY);
+				MetadataDatabaseCredentials.USERNAME = conf.get(
+						MetadataDatabaseCredentials.USERNAME_KEY);
+				MetadataDatabaseCredentials.PASSWORD = conf.get(
+						MetadataDatabaseCredentials.PASSWORD_KEY);
+			} catch(Exception e) {
+				System.out.println("Database credentials are not set");
+				e.printStackTrace();
+			}
+
 			try{
 				WRITER = new QueryMetadataWriter();
 			} catch(Exception e) {
