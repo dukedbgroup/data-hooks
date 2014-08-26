@@ -462,28 +462,30 @@ public class HookUtils {
 		}
 
 		HiveStageInfo hiveStageInfo = new HiveStageInfo();
-                hiveStageInfo.setStageId(task.getId());
+		hiveStageInfo.setStageId(task.getId());
 		hiveStageInfo.setHadoopJobId(task.getJobID());
 		hiveStageInfo.setStageType(task.getType().name());
 
 		if (task instanceof ExecDriver){
 			// add all input paths
-			// mayuresh: hive 0.12 provides getPathToAliases() functionality only on MapWork, not on MapReduceWork
-			hiveStageInfo.getInputPaths().addAll(((ExecDriver)task).getWork().getMapWork().getPathToAliases().keySet());
+			// hiveStageInfo.getInputPaths().addAll(((ExecDriver)task).getWork().getPathToAliases().keySet());
+			hiveStageInfo.getInputPaths().addAll(((ExecDriver)task).getWork().getMapWork().getPathToAliases().keySet()); // Hive12 and after
 
-		    // add alias to path
-			Map<String, ArrayList<String>> pathToAlias = ((ExecDriver)task).getWork().getMapWork().getPathToAliases();
- 			for (Map.Entry<String, ArrayList<String>> entry: pathToAlias.entrySet()) {
- 				String path = entry.getKey();
- 				List<String> aliasArray = entry.getValue();
- 				for (String alias : aliasArray) {
- 					alias = getLastAlias(alias);
- 					hiveStageInfo.getAliasToPath().put(alias, path);
- 				}
- 			}
+
+			// add alias to path
+			// Map<String, ArrayList<String>> pathToAlias = ((ExecDriver)task).getMapWork().getPathToAliases();`<
+			Map<String, ArrayList<String>> pathToAlias = ((ExecDriver)task).getWork().getMapWork().getPathToAliases(); // Hive12 and after
+			for (Map.Entry<String, ArrayList<String>> entry: pathToAlias.entrySet()) {
+				String path = entry.getKey();
+				List<String> aliasArray = entry.getValue();
+				for (String alias : aliasArray) {
+					alias = getLastAlias(alias);
+					hiveStageInfo.getAliasToPath().put(alias, path);
+				}
+			}
 
 			// get the mapping between table alias and table names
-			Map<String, PartitionDesc> map = ((ExecDriver)task).getWork().getMapWork().getAliasToPartnInfo();
+			Map<String, PartitionDesc> map = ((ExecDriver)task).getWork().getMapWork().getAliasToPartnInfo(); // Hive12 and after
 			for (Map.Entry<String, PartitionDesc> entry : map.entrySet()) {
 				String alias = entry.getKey();
 				alias = getLastAlias(alias);
@@ -498,6 +500,7 @@ public class HookUtils {
 
 		// Add map/reduce tasks of this stage
 		populateHiveTaskInfos(hiveStageInfo.getHiveTaskInfos(), task, hiveStageInfo);
+
 
 		// Recursively add other hive stages and the graph info
 		// Reference ExplainTask#outputDependencies
@@ -584,8 +587,7 @@ public class HookUtils {
 
 		// Add Map Operators
 		populateHiveOperatorInfos(mapTaskInfo.getHiveOperatorInfos(),
-				getGenericOperatorCollection(mrTask.getWork().getMapWork().getAliasToWork()
-						.values()), hiveStageInfo);
+				getGenericOperatorCollection(mrTask.getWork().getMapWork().getAliasToWork().values()), hiveStageInfo); // Hive12 and after
 
 		hiveTaskInfos.add(mapTaskInfo);
 
@@ -593,11 +595,12 @@ public class HookUtils {
 		HiveTaskInfo reduceTaskInfo = new HiveTaskInfo();
 		reduceTaskInfo.setTaskId(task.getId() + "REDUCE");
 		reduceTaskInfo.setTaskType("REDUCE");
-
+		
 		// Add Reduce Operators
 		Collection<Operator> reduceOps = new ArrayList<Operator>();
-		if (mrTask.getWork().getReduceWork().getReducer() != null) {
-			reduceOps.add(mrTask.getWork().getReduceWork().getReducer());
+		if (mrTask.getWork().getReduceWork() != null &&
+		    mrTask.getWork().getReduceWork().getReducer() != null) { // Hive12 and after
+		    reduceOps.add(mrTask.getWork().getReduceWork().getReducer());
 		}
 		populateHiveOperatorInfos(reduceTaskInfo.getHiveOperatorInfos(),
 				reduceOps, hiveStageInfo);
@@ -613,7 +616,7 @@ public class HookUtils {
 
 		for (Operator operator : operators) {
 			HiveOperatorInfo hiveOperatorInfo = new HiveOperatorInfo();
-
+			
 			populateHiveOperatorDetail(hiveOperatorInfo, operator, hiveStageInfo);
 
 			// Recursively add operators
@@ -628,289 +631,289 @@ public class HookUtils {
 	}
 
     private static void populateHiveOperatorDetail( HiveOperatorInfo hiveOperatorInfo,
-                                                    Operator operator,
-                                                    HiveStageInfo hiveStageInfo) {
-        hiveOperatorInfo.setOperatorId(operator.getOperatorId());
-        hiveOperatorInfo.setOperatorType(operator.getType().toString());
+    		Operator operator,
+    		HiveStageInfo hiveStageInfo) {
+    	hiveOperatorInfo.setOperatorId(operator.getOperatorId());
+    	hiveOperatorInfo.setOperatorType(operator.getType().toString());
 
-        //ToDo: Hive 0.12
+    	//ToDo: Hive 0.12
 
-        StringBuilder sb = new StringBuilder(400);
-        // Add operator comment
-        String comment = null;
-        OperatorType type = operator.getType();
-        try {
-            switch (type) {
-                case JOIN:
-                    // common join
-                    JoinDesc desc = (JoinDesc) operator.getConf();
-                    composeJoinComment(sb, desc);
+    	StringBuilder sb = new StringBuilder(400);
+    	// Add operator comment
+    	String comment = null;
+    	OperatorType type = operator.getType();
+    	try {
+    		switch (type) {
+    		case JOIN:
+    			// common join
+    			JoinDesc desc = (JoinDesc) operator.getConf();
+    			composeJoinComment(sb, desc);
 
 
-                    for (HiveColumnInfo hCol : hiveStageInfo.getPartitionColumns()) {
-                        textAppend(sb, "joinKeys", hCol.getColumnName());
-                    }
-                    // for common join, the join keys are same as the job's partition keys
-                    hiveStageInfo.setJoinKeys(hiveStageInfo.getPartitionColumns());
-                    hiveStageInfo.setJoinType(hiveOperatorInfo.getOperatorType());
-                    comment = sb.toString();
-                    break;
-                case MAPJOIN: {
-                    String mapJoinVariant = null;
-                    // map join, including bucket map join and sort merge bucket map join
-                    // for SMBMapJoin, the type is also "MAPJOIN" in Hive, which is confusing
-                    // thus we set to "SMB_JOIN" by ourselves
-                    if (operator instanceof SMBMapJoinOperator) { // Sorted Merge Bucket Map Join Operator
-                        hiveOperatorInfo.setOperatorType(HiveOperatorInfo.SMB_JOIN);
-                        mapJoinVariant = "Sorted Merge Bucket";
-                    }
+    			for (HiveColumnInfo hCol : hiveStageInfo.getPartitionColumns()) {
+    				textAppend(sb, "joinKeys", hCol.getColumnName());
+    			}
+    			// for common join, the join keys are same as the job's partition keys
+    			hiveStageInfo.setJoinKeys(hiveStageInfo.getPartitionColumns());
+    			hiveStageInfo.setJoinType(hiveOperatorInfo.getOperatorType());
+    			comment = sb.toString();
+    			break;
+    		case MAPJOIN: {
+    			String mapJoinVariant = null;
+    			// map join, including bucket map join and sort merge bucket map join
+    			// for SMBMapJoin, the type is also "MAPJOIN" in Hive, which is confusing
+    			// thus we set to "SMB_JOIN" by ourselves
+    			if (operator instanceof SMBMapJoinOperator) { // Sorted Merge Bucket Map Join Operator
+    				hiveOperatorInfo.setOperatorType(HiveOperatorInfo.SMB_JOIN);
+    				mapJoinVariant = "Sorted Merge Bucket";
+    			}
 
-                    // for map join, the join keys can be obtained directly
-                    JoinDesc joinDesc = (JoinDesc) operator.getConf();
-                    for (Map.Entry<Byte, List<ExprNodeDesc>> entry : joinDesc.getExprs().entrySet()) {
-                        for (ExprNodeDesc exprNodeDesc : entry.getValue()) {
-                            if (exprNodeDesc instanceof ExprNodeColumnDesc) {
-                                HiveColumnInfo hiveColumnInfo = new HiveColumnInfo();
-                                populateHiveColumnInfo(hiveColumnInfo, (ExprNodeColumnDesc) exprNodeDesc, hiveStageInfo);
-                                hiveStageInfo.getJoinKeys().add(hiveColumnInfo);
-                            }
-                        }
-                    }
-                    composeJoinComment(sb, joinDesc);
+    			// for map join, the join keys can be obtained directly
+    			JoinDesc joinDesc = (JoinDesc) operator.getConf();
+    			for (Map.Entry<Byte, List<ExprNodeDesc>> entry : joinDesc.getExprs().entrySet()) {
+    				for (ExprNodeDesc exprNodeDesc : entry.getValue()) {
+    					if (exprNodeDesc instanceof ExprNodeColumnDesc) {
+    						HiveColumnInfo hiveColumnInfo = new HiveColumnInfo();
+    						populateHiveColumnInfo(hiveColumnInfo, (ExprNodeColumnDesc) exprNodeDesc, hiveStageInfo);
+    						hiveStageInfo.getJoinKeys().add(hiveColumnInfo);
+    					}
+    				}
+    			}
+    			composeJoinComment(sb, joinDesc);
 
-                    if (joinDesc instanceof HashTableSinkDesc) {  //  HashTable Sink Operator
-                        HashTableSinkDesc htSink = (HashTableSinkDesc)joinDesc;
-                        Map<Byte, List<ExprNodeDesc>> byte2elist = htSink.getKeys();
-                        composeKeysComment(sb, byte2elist);
-                        textAppend(sb, "Position of Big Table", htSink.getPosBigTable());
-                        mapJoinVariant = "HashTable Sink";
-                    } else if (joinDesc instanceof MapJoinDesc) {
-                        MapJoinDesc mapJoinDesc = (MapJoinDesc)joinDesc;
-                        Map<Byte, List<ExprNodeDesc>> byte2elist = mapJoinDesc.getKeys();
-                        composeKeysComment(sb, byte2elist);
-                        textAppend(sb, "Position of Big Table", mapJoinDesc.getPosBigTable());
-                        /*not in hive10 if ( mapJoinDesc.isBucketMapJoin()  &&  mapJoinVariant == null) {
-                            mapJoinVariant = "Bucket";
-                        }*/
-                        }
-                    textAppend(sb, "Map Join Variant", mapJoinVariant);
+    			if (joinDesc instanceof HashTableSinkDesc) {  //  HashTable Sink Operator
+    				HashTableSinkDesc htSink = (HashTableSinkDesc)joinDesc;
+    			Map<Byte, List<ExprNodeDesc>> byte2elist = htSink.getKeys();
+    			composeKeysComment(sb, byte2elist);
+    			textAppend(sb, "Position of Big Table", htSink.getPosBigTable());
+    			mapJoinVariant = "HashTable Sink";
+    			} else if (joinDesc instanceof MapJoinDesc) {
+    				MapJoinDesc mapJoinDesc = (MapJoinDesc)joinDesc;
+    				Map<Byte, List<ExprNodeDesc>> byte2elist = mapJoinDesc.getKeys();
+    				composeKeysComment(sb, byte2elist);
+    				textAppend(sb, "Position of Big Table", mapJoinDesc.getPosBigTable());
+    				if (mapJoinDesc.isBucketMapJoin() &&  mapJoinVariant == null) { // Hive12 and after
+    					mapJoinVariant = "Bucket";
+    				}
+    			}
+    			textAppend(sb, "Map Join Variant", mapJoinVariant);
 
-                    hiveStageInfo.setJoinType(hiveOperatorInfo.getOperatorType());
-                    comment = sb.toString();
-                    break;
-                }
-                case EXTRACT:
-                    ExtractDesc extractDesc = (ExtractDesc) operator.getConf();
-                    comment = "extract: " + extractDesc.getCol().getExprString();
-                    break;
-                case FILTER: {
-                    FilterDesc filterDesc = (FilterDesc) operator.getConf();
-                    if (filterDesc != null && filterDesc.getPredicate() != null) {
-                        comment = filterDesc.getPredicate().getExprString(); //ToDo: is this enough?
+    			hiveStageInfo.setJoinType(hiveOperatorInfo.getOperatorType());
+    			comment = sb.toString();
+    			break;
+    		}
+    		case EXTRACT:
+    			ExtractDesc extractDesc = (ExtractDesc) operator.getConf();
+    			comment = "extract: " + extractDesc.getCol().getExprString();
+    			break;
+    		case FILTER: {
+    			FilterDesc filterDesc = (FilterDesc) operator.getConf();
+    			if (filterDesc != null && filterDesc.getPredicate() != null) {
+    				comment = filterDesc.getPredicate().getExprString(); //ToDo: is this enough?
 
-                        // also extract the predicate expression
-                        if (filterDesc.getPredicate() instanceof ExprNodeGenericFuncDesc) {
-                            ExprNodeGenericFuncDesc predicate = (ExprNodeGenericFuncDesc) filterDesc.getPredicate();
-                            List<ExprNodeDesc> childExprs = predicate.getChildExprs();
-                            if (childExprs != null && childExprs.size() == 2) {
-                                ExprNodeDesc child1 = childExprs.get(0);
-                                ExprNodeDesc child2 = childExprs.get(1);
-                                // one should be column (ExprNodeColumnDesc) and the other one should be
-                                // constant (ExprNodeConstantDesc)
-                                if (child2 instanceof ExprNodeColumnDesc) {
-                                    // swap to make sure the child1 is the column
-                                    child2 = childExprs.get(0);
-                                    child1 = childExprs.get(1);
-                                }
-                                if (child1 instanceof ExprNodeColumnDesc && child2 instanceof ExprNodeConstantDesc) {
-                                    HiveFilterInfo hiveFilterInfo = new HiveFilterInfo();
-                                    populateHiveColumnInfo(hiveFilterInfo, (ExprNodeColumnDesc) child1, hiveStageInfo);
-                                    hiveFilterInfo.setExpr(comment);
-                                    hiveStageInfo.getConstFilters().add(hiveFilterInfo);
-                                }
-                            }
-                        }
-                    }
-                    break;
-                }
-                case FORWARD:
-                    ForwardDesc forwardDesc = (ForwardDesc) operator.getConf();
-                    break;
-                case GROUPBY: {
-                    GroupByDesc groupByDesc = (GroupByDesc) operator.getConf();
-                    for (ExprNodeDesc enode : groupByDesc.getKeys()) {
-                        textAppend(sb, "keys", enode.getExprString());
-                    }
-                    for (String outCol : groupByDesc.getOutputColumnNames()) {
-                        textAppend(sb, TITLE_OUTPUT_COLS, outCol);
-                    }
+    				// also extract the predicate expression
+    				if (filterDesc.getPredicate() instanceof ExprNodeGenericFuncDesc) {
+    					ExprNodeGenericFuncDesc predicate = (ExprNodeGenericFuncDesc) filterDesc.getPredicate();
+    					List<ExprNodeDesc> childExprs = predicate.getChildExprs();
+    					if (childExprs != null && childExprs.size() == 2) {
+    						ExprNodeDesc child1 = childExprs.get(0);
+    						ExprNodeDesc child2 = childExprs.get(1);
+    						// one should be column (ExprNodeColumnDesc) and the other one should be
+    						// constant (ExprNodeConstantDesc)
+    						if (child2 instanceof ExprNodeColumnDesc) {
+    							// swap to make sure the child1 is the column
+    							child2 = childExprs.get(0);
+    							child1 = childExprs.get(1);
+    						}
+    						if (child1 instanceof ExprNodeColumnDesc && child2 instanceof ExprNodeConstantDesc) {
+    							HiveFilterInfo hiveFilterInfo = new HiveFilterInfo();
+    							populateHiveColumnInfo(hiveFilterInfo, (ExprNodeColumnDesc) child1, hiveStageInfo);
+    							hiveFilterInfo.setExpr(comment);
+    							hiveStageInfo.getConstFilters().add(hiveFilterInfo);
+    						}
+    					}
+    				}
+    			}
+    			break;
+    		}
+    		case FORWARD:
+    			ForwardDesc forwardDesc = (ForwardDesc) operator.getConf();
+    			break;
+    		case GROUPBY: {
+    			GroupByDesc groupByDesc = (GroupByDesc) operator.getConf();
+    			for (ExprNodeDesc enode : groupByDesc.getKeys()) {
+    				textAppend(sb, "keys", enode.getExprString());
+    			}
+    			for (String outCol : groupByDesc.getOutputColumnNames()) {
+    				textAppend(sb, TITLE_OUTPUT_COLS, outCol);
+    			}
 
-                    for (AggregationDesc agg : groupByDesc.getAggregators()) {
-                        textAppend(sb, "aggregations", agg.getExprString());
-                    }
+    			for (AggregationDesc agg : groupByDesc.getAggregators()) {
+    				textAppend(sb, "aggregations", agg.getExprString());
+    			}
 
-                    if (groupByDesc.getAggregators().size() == 0) { // this implies groupby to accomplish distinct
-                        textAppend(sb, "distinct", "implied");
-                    }
-                    //if (groupByDesc.isDistinct()) {
-		    //textAppend(sb, "distinct", "explicit");
-		    //}
-                    comment = sb.toString();
-                    break;
-                }
-                case LIMIT:
-                    LimitDesc limitDesc = (LimitDesc) operator.getConf();
-                    comment = "limit: " + limitDesc.getLimit();
-                    break;
-                case SCRIPT:
-                    ScriptDesc scriptDesc = (ScriptDesc) operator.getConf();
-                    comment = scriptDesc.getScriptCmd();
-                    break;
-                case SELECT: {
-                    SelectDesc selectDesc = (SelectDesc) operator.getConf();
-                    List<ExprNodeDesc> enList = selectDesc.getColList();
-                    for (ExprNodeDesc exprNodeDesc : enList) {
-                        if (exprNodeDesc instanceof ExprNodeFieldDesc) {
-                            ExprNodeFieldDesc fieldDesc = (ExprNodeFieldDesc)exprNodeDesc;
-                            textAppend(sb, TITLE_SELECT, fieldDesc.getExprString());
-                        } else if (exprNodeDesc instanceof ExprNodeColumnDesc) {
-                            ExprNodeColumnDesc exprNodeColumnDesc = (ExprNodeColumnDesc)exprNodeDesc;
-                            textAppend(sb, TITLE_SELECT, exprNodeColumnDesc.getExprString());
-                        } else if (exprNodeDesc instanceof ExprNodeConstantDesc) {
-                            ExprNodeConstantDesc exprNodeConstantDesc = (ExprNodeConstantDesc)exprNodeDesc;
-                            textAppend(sb, TITLE_SELECT, exprNodeConstantDesc.getExprString());
-                        } else if (exprNodeDesc instanceof ExprNodeGenericFuncDesc) {
-                            ExprNodeGenericFuncDesc exprNodeGenericFuncDesc = (ExprNodeGenericFuncDesc)exprNodeDesc;
-                            textAppend(sb, TITLE_SELECT, exprNodeGenericFuncDesc.getExprString());
-                        }
-                    }
+    			if (groupByDesc.getAggregators().size() == 0) { // this implies groupby to accomplish distinct
+    				textAppend(sb, "distinct", "implied");
+    			}
+    			if (groupByDesc.isDistinct()) { // Hive12 and after
+    				textAppend(sb, "distinct", "explicit");
+    			}
+    			comment = sb.toString();
+    			break;
+    		}
+    		case LIMIT:
+    			LimitDesc limitDesc = (LimitDesc) operator.getConf();
+    			comment = "limit: " + limitDesc.getLimit();
+    			break;
+    		case SCRIPT:
+    			ScriptDesc scriptDesc = (ScriptDesc) operator.getConf();
+    			comment = scriptDesc.getScriptCmd();
+    			break;
+    		case SELECT: {
+    			SelectDesc selectDesc = (SelectDesc) operator.getConf();
+    			List<ExprNodeDesc> enList = selectDesc.getColList();
+    			for (ExprNodeDesc exprNodeDesc : enList) {
+    				if (exprNodeDesc instanceof ExprNodeFieldDesc) {
+    					ExprNodeFieldDesc fieldDesc = (ExprNodeFieldDesc)exprNodeDesc;
+    					textAppend(sb, TITLE_SELECT, fieldDesc.getExprString());
+    				} else if (exprNodeDesc instanceof ExprNodeColumnDesc) {
+    					ExprNodeColumnDesc exprNodeColumnDesc = (ExprNodeColumnDesc)exprNodeDesc;
+    					textAppend(sb, TITLE_SELECT, exprNodeColumnDesc.getExprString());
+    				} else if (exprNodeDesc instanceof ExprNodeConstantDesc) {
+    					ExprNodeConstantDesc exprNodeConstantDesc = (ExprNodeConstantDesc)exprNodeDesc;
+    					textAppend(sb, TITLE_SELECT, exprNodeConstantDesc.getExprString());
+    				} else if (exprNodeDesc instanceof ExprNodeGenericFuncDesc) {
+    					ExprNodeGenericFuncDesc exprNodeGenericFuncDesc = (ExprNodeGenericFuncDesc)exprNodeDesc;
+    					textAppend(sb, TITLE_SELECT, exprNodeGenericFuncDesc.getExprString());
+    				}
+    			}
 
-                    for (String outCol : selectDesc.getOutputColumnNames()) {
-                        textAppend(sb, TITLE_OUTPUT_COLS, outCol);
-                    }
-                    comment = sb.toString();
-                    break;
-                }
-                case TABLESCAN:  // TableScan: which table
-                    TableScanDesc tableScanDesc = (TableScanDesc) operator.getConf();
-                    textAppend(sb, "alias", tableScanDesc.getAlias());
-                    if (tableScanDesc.getPartColumns() != null) {
-                        List<String> clist = tableScanDesc.getPartColumns();
-                        for (String col : clist) {
-                            textAppend(sb, "partitionCols", col);
-                        }
-                    }
-                    if (tableScanDesc.getFilterExpr() != null) {
-                        textAppend(sb, "FilterExpr",  tableScanDesc.getFilterExpr().getExprString());
-                    }
-                    //if (tableScanDesc.getRowLimit() > 0) {
-		    //textAppend(sb, "rowLimit", tableScanDesc.getRowLimit());
-		    //}
-                    comment = sb.toString();
-                    break;
-                case FILESINK: {
-                    FileSinkDesc fileSinkDesc = (FileSinkDesc) operator.getConf();
-                    textAppend(sb, "dirName", fileSinkDesc.getDirName());
-                    if (fileSinkDesc.getDirName() != null &&
-                          fileSinkDesc.getFinalDirName() != null &&
-                          ! fileSinkDesc.getDirName().equals(fileSinkDesc.getFinalDirName())) {
-                        textAppend(sb, "finalDirName", fileSinkDesc.getFinalDirName());
-                    }
-                    textAppend(sb, "numFiles", fileSinkDesc.getNumFiles());
-                    if (fileSinkDesc.getPartitionCols() != null) {
-                        for (ExprNodeDesc enode : fileSinkDesc.getPartitionCols()) {
-                            textAppend(sb, "partitionCols", enode.getExprString());
-                        }
-                    }
-                    comment = sb.toString();
-                    break;
-                }
-                case REDUCESINK: {
-                    ReduceSinkDesc reduceSinkDesc = (ReduceSinkDesc) operator.getConf();
-                    if (reduceSinkDesc.getPartitionCols() != null) {
-                        for (ExprNodeDesc exprNodeDesc : reduceSinkDesc.getPartitionCols()) {
-                            if (exprNodeDesc instanceof ExprNodeColumnDesc) {
-                                HiveColumnInfo hiveColumnInfo = new HiveColumnInfo();
-                                populateHiveColumnInfo(hiveColumnInfo, (ExprNodeColumnDesc) exprNodeDesc, hiveStageInfo);
-                                hiveStageInfo.getPartitionColumns().add(hiveColumnInfo);
-                            }
-                        }
-                    }
+    			for (String outCol : selectDesc.getOutputColumnNames()) {
+    				textAppend(sb, TITLE_OUTPUT_COLS, outCol);
+    			}
+    			comment = sb.toString();
+    			break;
+    		}
+    		case TABLESCAN:  // TableScan: which table
+    		TableScanDesc tableScanDesc = (TableScanDesc) operator.getConf();
+    		textAppend(sb, "alias", tableScanDesc.getAlias());
+    		if (tableScanDesc.getPartColumns() != null) {
+    			List<String> clist = tableScanDesc.getPartColumns();
+    			for (String col : clist) {
+    				textAppend(sb, "partitionCols", col);
+    			}
+    		}
+    		if (tableScanDesc.getFilterExpr() != null) {
+    			textAppend(sb, "FilterExpr",  tableScanDesc.getFilterExpr().getExprString());
+    		}
+    		if (tableScanDesc.getRowLimit() > 0) { // Hive12 and after
+    			textAppend(sb, "rowLimit", tableScanDesc.getRowLimit());
+    		}
+    		comment = sb.toString();
+    		break;
+    		case FILESINK: {
+    			FileSinkDesc fileSinkDesc = (FileSinkDesc) operator.getConf();
+    			textAppend(sb, "dirName", fileSinkDesc.getDirName());
+    			if (fileSinkDesc.getDirName() != null &&
+    					fileSinkDesc.getFinalDirName() != null &&
+    					! fileSinkDesc.getDirName().equals(fileSinkDesc.getFinalDirName())) {
+    				textAppend(sb, "finalDirName", fileSinkDesc.getFinalDirName());
+    			}
+    			textAppend(sb, "numFiles", fileSinkDesc.getNumFiles());
+    			if (fileSinkDesc.getPartitionCols() != null) {
+    				for (ExprNodeDesc enode : fileSinkDesc.getPartitionCols()) {
+    					textAppend(sb, "partitionCols", enode.getExprString());
+    				}
+    			}
+    			comment = sb.toString();
+    			break;
+    		}
+    		case REDUCESINK: {
+    			ReduceSinkDesc reduceSinkDesc = (ReduceSinkDesc) operator.getConf();
+    			if (reduceSinkDesc.getPartitionCols() != null) {
+    				for (ExprNodeDesc exprNodeDesc : reduceSinkDesc.getPartitionCols()) {
+    					if (exprNodeDesc instanceof ExprNodeColumnDesc) {
+    						HiveColumnInfo hiveColumnInfo = new HiveColumnInfo();
+    						populateHiveColumnInfo(hiveColumnInfo, (ExprNodeColumnDesc) exprNodeDesc, hiveStageInfo);
+    						hiveStageInfo.getPartitionColumns().add(hiveColumnInfo);
+    					}
+    				}
+    			}
 
-                    ArrayList<ExprNodeDesc> eNodeList = reduceSinkDesc.getKeyCols();
-                    if (eNodeList != null) {
-                        for (ExprNodeDesc exprNodeDesc : eNodeList) {
-                            textAppend(sb, "key expressions", exprNodeDesc.getExprString());
-                        }
-                    }
-                    eNodeList = reduceSinkDesc.getValueCols();
-                    if (eNodeList != null) {
-                        for (ExprNodeDesc exprNodeDesc : eNodeList) {
-                            textAppend(sb, "value expressions", exprNodeDesc.getExprString());
-                        }
-                    }
-                    eNodeList = reduceSinkDesc.getPartitionCols();
-                    if (eNodeList != null) {
-                        for (ExprNodeDesc exprNodeDesc : eNodeList) {
-                            textAppend(sb, "Map-reduce partition columns", exprNodeDesc.getExprString());
-                        }
-                    }
-                    if (reduceSinkDesc.getOutputKeyColumnNames() != null) {
-                        for (String outKey : reduceSinkDesc.getOutputKeyColumnNames()) {
-                            textAppend(sb, "outputKey", outKey);
-                        }
-                    }
-                    if (reduceSinkDesc.getOutputValueColumnNames() != null) {
-                        for (String outValue : reduceSinkDesc.getOutputValueColumnNames()) {
-                            textAppend(sb, "outputCols", outValue);
-                        }
-                    }
-                    if (reduceSinkDesc.getNumReducers() > 0) {
-                        textAppend(sb, "numReducers", reduceSinkDesc.getNumReducers());
-                    }
-                    comment = sb.toString();
-                    break;
-                }
-                case UNION:
-                    UnionDesc unionDesc = (UnionDesc) operator.getConf();
-                    comment = "union of " + unionDesc.getNumInputs() + " inputs";
-                    break;
-                case UDTF:
-                    UDTFDesc udtfDesc = (UDTFDesc) operator.getConf();
-                    comment = "UDTF: " + udtfDesc.getUDTFName();
-                    break;
-                case LATERALVIEWJOIN:
-                    LateralViewJoinDesc lateralViewJoinDesc = (LateralViewJoinDesc) operator.getConf();
-                    comment = "Lateral View Join: ";
-                    for (String s : lateralViewJoinDesc.getOutputInternalColNames()) {
-                        comment += " " + s;
-                    }
-                    break;
-                case LATERALVIEWFORWARD:
-                    LateralViewForwardDesc lateralViewForwardDesc = (LateralViewForwardDesc) operator.getConf();
-                    comment = "Lateral View Forward";
-                    break;
-                case HASHTABLESINK:
-                    HashTableSinkDesc hashTableSinkDesc = (HashTableSinkDesc) operator.getConf();
-                    comment = "conditions: ";
-                    for (JoinCondDesc joinCondDesc : hashTableSinkDesc.getConds()) {
-                        comment += " " + joinCondDesc.getJoinCondString();
-                    }
-                    break;
-                case HASHTABLEDUMMY:
-                    HashTableDummyDesc hashTableDummyDesc = (HashTableDummyDesc) operator.getConf();
-                    break;
-            }
-        } catch (ClassCastException ce) {
-            errorMessage("WARN: ignored ClassCastException: " + org.apache.hadoop.util.StringUtils.stringifyException(ce));
-        } catch (Throwable e) {
-            // ToDo: proactively check for nulls, if needed, to avoid catch overhead
-            // just in case a dereference is null (this might be unnecessarily defensive)
-            //  Note the NPE
-            errorMessage("WARN: ignored NPE: " + org.apache.hadoop.util.StringUtils.stringifyException(e));
-            return;
-        }
-        hiveOperatorInfo.setComment(comment);
+    			ArrayList<ExprNodeDesc> eNodeList = reduceSinkDesc.getKeyCols();
+    			if (eNodeList != null) {
+    				for (ExprNodeDesc exprNodeDesc : eNodeList) {
+    					textAppend(sb, "key expressions", exprNodeDesc.getExprString());
+    				}
+    			}
+    			eNodeList = reduceSinkDesc.getValueCols();
+    			if (eNodeList != null) {
+    				for (ExprNodeDesc exprNodeDesc : eNodeList) {
+    					textAppend(sb, "value expressions", exprNodeDesc.getExprString());
+    				}
+    			}
+    			eNodeList = reduceSinkDesc.getPartitionCols();
+    			if (eNodeList != null) {
+    				for (ExprNodeDesc exprNodeDesc : eNodeList) {
+    					textAppend(sb, "Map-reduce partition columns", exprNodeDesc.getExprString());
+    				}
+    			}
+    			if (reduceSinkDesc.getOutputKeyColumnNames() != null) {
+    				for (String outKey : reduceSinkDesc.getOutputKeyColumnNames()) {
+    					textAppend(sb, "outputKey", outKey);
+    				}
+    			}
+    			if (reduceSinkDesc.getOutputValueColumnNames() != null) {
+    				for (String outValue : reduceSinkDesc.getOutputValueColumnNames()) {
+    					textAppend(sb, "outputCols", outValue);
+    				}
+    			}
+    			if (reduceSinkDesc.getNumReducers() > 0) {
+    				textAppend(sb, "numReducers", reduceSinkDesc.getNumReducers());
+    			}
+    			comment = sb.toString();
+    			break;
+    		}
+    		case UNION:
+    			UnionDesc unionDesc = (UnionDesc) operator.getConf();
+    			comment = "union of " + unionDesc.getNumInputs() + " inputs";
+    			break;
+    		case UDTF:
+    			UDTFDesc udtfDesc = (UDTFDesc) operator.getConf();
+    			comment = "UDTF: " + udtfDesc.getUDTFName();
+    			break;
+    		case LATERALVIEWJOIN:
+    			LateralViewJoinDesc lateralViewJoinDesc = (LateralViewJoinDesc) operator.getConf();
+    			comment = "Lateral View Join: ";
+    			for (String s : lateralViewJoinDesc.getOutputInternalColNames()) {
+    				comment += " " + s;
+    			}
+    			break;
+    		case LATERALVIEWFORWARD:
+    			LateralViewForwardDesc lateralViewForwardDesc = (LateralViewForwardDesc) operator.getConf();
+    			comment = "Lateral View Forward";
+    			break;
+    		case HASHTABLESINK:
+    			HashTableSinkDesc hashTableSinkDesc = (HashTableSinkDesc) operator.getConf();
+    			comment = "conditions: ";
+    			for (JoinCondDesc joinCondDesc : hashTableSinkDesc.getConds()) {
+    				comment += " " + joinCondDesc.getJoinCondString();
+    			}
+    			break;
+    		case HASHTABLEDUMMY:
+    			HashTableDummyDesc hashTableDummyDesc = (HashTableDummyDesc) operator.getConf();
+    			break;
+    		}
+    	} catch (ClassCastException ce) {
+    		errorMessage("WARN: ignored ClassCastException: " + org.apache.hadoop.util.StringUtils.stringifyException(ce));
+    	} catch (Throwable e) {
+    		// ToDo: proactively check for nulls, if needed, to avoid catch overhead
+    		// just in case a dereference is null (this might be unnecessarily defensive)
+    		//  Note the NPE
+    		errorMessage("WARN: ignored E: " + org.apache.hadoop.util.StringUtils.stringifyException(e));
+    		return;
+    	}
+    	hiveOperatorInfo.setComment(comment);
     }
 
     private static void composeKeysComment(StringBuilder sb, Map<Byte, List<ExprNodeDesc>> byte2elist) {

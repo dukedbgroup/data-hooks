@@ -117,6 +117,7 @@ public class ProfileDataWriter {
 			stmt.executeUpdate(sb.toString());
 		} catch (SQLException e) {
 			e.printStackTrace();
+			System.out.println("Failing row " + sb.toString());
 		}
 	}
 
@@ -194,4 +195,86 @@ public class ProfileDataWriter {
 		}
 	}
 
+	/**
+	 * Fetches highest cid from 'components' table
+	 * given a wid
+	 * @return
+	 */
+	private synchronized Long fetchLastComponentId(Long wid) {
+		if("No write".equals(MODE)) {
+			return 0L;
+		}
+		StringBuffer sb = new StringBuffer();
+		sb.append("SELECT MAX(" + ProfileTables.COMPONENT_ID + ") FROM ");
+		sb.append(ProfileTables.COMPONENT_TABLE);
+		sb.append(" WHERE " + ProfileTables.WORKFLOW_ID + "=" + wid);
+		ResultSet rs = null;
+		try {
+			//			System.out.println("Running query: " + sb.toString());
+			rs = stmt.executeQuery(sb.toString());
+			if(rs.next()) {
+				return rs.getLong(1);
+			} else {
+				return 0L;
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+			return 0L;
+		} finally {
+			try {
+				if(rs!=null) {
+					rs.close();
+				}
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	/**
+	 * Fetches highest qid from 'queries' table
+	 * given a wid and cid
+	 * @return
+	 */
+	private synchronized Long fetchLastQueryId(Long wid, Long cid) {
+		if("No write".equals(MODE)) {
+			return 0L;
+		}
+		StringBuffer sb = new StringBuffer();
+		sb.append("SELECT MAX(" + ProfileTables.QUERY_ID + ") FROM ");
+		sb.append(ProfileTables.QUERY_TABLE);
+		sb.append(" WHERE " + ProfileTables.WORKFLOW_ID + "=" + wid);
+		sb.append(" AND " + ProfileTables.COMPONENT_ID + "=" + cid);
+		ResultSet rs = null;
+		try {
+			//			System.out.println("Running query: " + sb.toString());
+			rs = stmt.executeQuery(sb.toString());
+			if(rs.next()) {
+				return rs.getLong(1);
+			} else {
+				return 0L;
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+			return 0L;
+		} finally {
+			try {
+				if(rs!=null) {
+					rs.close();
+				}
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	/**
+	 * Used by Hive execution hook to find current query identifier
+	 * @return
+	 */
+	public synchronized Long[] fetchCurrentQueryId() {
+		Long lastWorkflowId = fetchLastWorkflowId();
+		Long lastComponentId = fetchLastComponentId(lastWorkflowId+1);
+		Long lastQueryId = fetchLastQueryId(lastWorkflowId+1, lastComponentId+1);
+		return new Long[]{lastWorkflowId+1, lastComponentId+1, lastQueryId+1};
+	}
 }

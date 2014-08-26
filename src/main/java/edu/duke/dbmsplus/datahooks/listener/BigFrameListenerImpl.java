@@ -21,6 +21,8 @@ import edu.duke.dbmsplus.datahooks.conf.HiveServerCredentials;
 import edu.duke.dbmsplus.datahooks.conf.MetadataDatabaseCredentials;
 import edu.duke.dbmsplus.datahooks.connection.JDBCConnector;
 import edu.duke.dbmsplus.datahooks.execution.SparkExecListener;
+import edu.duke.dbmsplus.datahooks.execution.ThothPostHook;
+import edu.duke.dbmsplus.datahooks.execution.ThothPreHook;
 import edu.duke.dbmsplus.datahooks.execution.profile.Component;
 import edu.duke.dbmsplus.datahooks.execution.profile.ProfileDataWriter;
 import edu.duke.dbmsplus.datahooks.execution.profile.Query;
@@ -229,6 +231,20 @@ public class BigFrameListenerImpl implements BigFrameListener {
 	 */
 	public Connection getHiveConnection() {
 		return hiveConnection;
+	}
+
+	/**
+	 * Adds exec hook that logs profiling data to metadata db
+	 */
+	public void addHiveExecHook() {
+		try {
+			hiveStmt.execute("set hive.exec.pre.hooks=" + 
+		ThothPreHook.class.getName());
+			hiveStmt.execute("set hive.exec.post.hooks=" + 
+		ThothPostHook.class.getName());
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**

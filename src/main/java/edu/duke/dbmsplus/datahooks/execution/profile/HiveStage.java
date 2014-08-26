@@ -13,7 +13,7 @@ public class HiveStage {
 	Long wid;
 	String stageId;
 	String hadoopJobId;
-	String[] dependentChildren;
+	String dependentChildren;
 	String hiveTaskInfos;
 	Long startTime;
 	Long endTime;
@@ -80,13 +80,13 @@ public class HiveStage {
 	/**
 	 * @return the dependentChildren
 	 */
-	public String[] getDependentChildren() {
+	public String getDependentChildren() {
 		return dependentChildren;
 	}
 	/**
 	 * @param dependentChildren the dependentChildren to set
 	 */
-	public void setDependentChildren(String[] dependentChildren) {
+	public void setDependentChildren(String dependentChildren) {
 		this.dependentChildren = dependentChildren;
 	}
 	/**

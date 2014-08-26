@@ -26,6 +26,10 @@ public class ProfileTables {
 	
 	// The string has to match exactly with the name of 'wid' field in WORKFLOW_TABLE
 	public static String WORKFLOW_ID = "wid";
+	// The string has to match exactly with the name of 'cid' field in COMPONENT_TABLE
+	public static String COMPONENT_ID = "cid";
+	// The string has to match exactly with the name of 'qid' field in QUERY_TABLE
+	public static String QUERY_ID = "qid";
 	
 	@SuppressWarnings("rawtypes")
 	static Map<String, Class> TABSCHEMAMAP = new HashMap<String, Class>();
