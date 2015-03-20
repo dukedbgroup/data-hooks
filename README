@@ -1,13 +1,9 @@
-This repository is used in conjunction with BigFrame (https://github.com/bigframeteam/BigFrame).
-It collects performance metrics from big data analytics systems by running BigFrame workflows. Additionally it
-runs a semantic analysis on queries to collect additional data useful for system optimization. Data is stored
-in a MySQL database.
+This repository is used in conjunction with BigFrame (https://github.com/bigframeteam/BigFrame). It collects performance metrics from big data analytics systems by running BigFrame workflows. Additionally it runs a semantic analysis on queries to collect additional data useful for system optimization. Data is stored in a MySQL database.
 
 To run,
 1. Build assembly file using sbt/sbt assembly.
 2. Copy the generated assembly jar into BigFrame's workflows/lib folder.
 3. Run any BigFrame workflow.
 
-Note: Currently only 'thoth' branch of BigFrame supports data collection. So please switch to this branch
-before Step 2.
+Note: Currently only 'thoth' branch of BigFrame supports data collection. So please switch to this branch before Step 2.
 
