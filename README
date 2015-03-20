@@ -1,16 +1,13 @@
-To compile:
-  1. Make sure you have scala 2.9.2 and sbt installed http://www.scala-sbt.org/
-  2. In the base directory run sbt clean package
-  3. This will compile and create sparkqueriesplanner_2.9.2-1.0.jar file in target/scala-2.9.2
+This repository is used in conjunction with BigFrame (https://github.com/bigframeteam/BigFrame).
+It collects performance metrics from big data analytics systems by running BigFrame workflows. Additionally it
+runs a semantic analysis on queries to collect additional data useful for system optimization. Data is stored
+in a MySQL database.
 
-To run:
-  1. Copy sparkqueriesplanner_2.9.2-1.0.jar in your Spark Master node's /root directory
-  2. Log in to the Spark Master node and go to the base directory of the spark installation (e.g., /usr/local/spark)
-  3. In the spark base directory run the following: export SPARK_CLASSPATH=/root/sparkqueriesplanner_2.9.2-1.0.jar; ./run -Dspark.cluster.taskscheduler=spark.scheduler.cluster.FairTaskSetQueuesManager -Dspark.fairscheduler.allocation.file=/root/alloc.xml -Dspark.storage.memoryFraction=.5 -Dspark.fairscheduler.fairness.logfile=/root/fairnesslog.txt edu.duke.dbmsplus.SparkQueriesPlannerDriver <program parameters> (run it without any param to printout the help)
-     3.a. The above command assumes that you are using our version of spark that has fair scheduler
-     3.b. The -D parameters are for setting the fairness scheduler in Spark
-     3.c. alloc.xml is an xml file for specifying the queues properties in the spark internal fair scheduler (a sample alloc.xml file is included in the sample directory)
+To run,
+1. Build assembly file using sbt/sbt assembly.
+2. Copy the generated assembly jar into BigFrame's workflows/lib folder.
+3. Run any BigFrame workflow.
 
-To Import into eclipse:
-  1. Ensure that your eclipse has the scala plugin installed (search for Scala IDE 2.1.0 Milestone 3)
-  2. In Eclipse add a new project (File -> New Project -> Java Project -> Location -> Choose the path to SparkQueriesPlanner)
+Note: Currently only 'thoth' branch of BigFrame supports data collection. So please switch to this branch
+before Step 2.
+
