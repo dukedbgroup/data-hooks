@@ -15,8 +15,8 @@ public class MetadataDatabaseCredentials {
 	public static final String USERNAME_KEY = "thoth.metadatadb.username";
 	public static final String PASSWORD_KEY = "thoth.metadatadb.password";
 
-	public static volatile String CONNECTION_STRING = "jdbc:mysql://localhost:3306/";
-	public static volatile String USERNAME = "root";
-	public static volatile String PASSWORD = "database";	
+	public static volatile String CONNECTION_STRING = "jdbc:mysql://localhost:3306/thoth";
+	public static volatile String USERNAME = "thoth";
+	public static volatile String PASSWORD = "thoth";	
 
 }

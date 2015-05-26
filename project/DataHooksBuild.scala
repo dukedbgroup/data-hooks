@@ -12,7 +12,7 @@ object DataHooksBuild extends Build {
  val SPARK_VERSION = "1.0.1"
 
  // Hive version
- val HIVE_VERSION = "0.12.0"
+ val HIVE_VERSION = "0.13.1"
 
  lazy val root = Project(id = "DataHooks", base = file("."), settings = rootSettings) 
 
@@ -41,7 +41,7 @@ object DataHooksBuild extends Build {
       "com.fasterxml.jackson.core" % "jackson-annotations" % "2.3.3" % "provided",
       "com.fasterxml.jackson.core" % "jackson-databind" % "2.3.3" % "provided",
       "junit" % "junit" % "4.11" % "provided",
-      "mysql" % "mysql-connector-java" % "5.1.26",
+      "mysql" % "mysql-connector-java" % "5.1.35",
       "org.apache.spark" % "spark-core_2.10" % SPARK_VERSION % "provided",
       "org.apache.hadoop" % "hadoop-core" % HADOOP_VERSION % "provided",
       "org.apache.hive" % "hive-exec" % HIVE_VERSION % "provided",

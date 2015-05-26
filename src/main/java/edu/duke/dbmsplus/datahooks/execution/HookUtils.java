@@ -552,7 +552,7 @@ public class HookUtils {
 			} else if (moveWork.getLoadFileWork() != null
 					&& queryInfo.getOutputType() != OutputType.TABLE) {
 				LoadFileDesc fileDesc = moveWork.getLoadFileWork();
-				queryInfo.setNamedOutput(fileDesc.getTargetDir());
+				queryInfo.setNamedOutput(fileDesc.getTargetDir().toString());
 				queryInfo.setOutputType(OutputType.DIRECTORY);
 			}
 		} else if (task instanceof DDLTask) {
@@ -714,7 +714,7 @@ public class HookUtils {
     				// also extract the predicate expression
     				if (filterDesc.getPredicate() instanceof ExprNodeGenericFuncDesc) {
     					ExprNodeGenericFuncDesc predicate = (ExprNodeGenericFuncDesc) filterDesc.getPredicate();
-    					List<ExprNodeDesc> childExprs = predicate.getChildExprs();
+    					List<ExprNodeDesc> childExprs = predicate.getChildren();
     					if (childExprs != null && childExprs.size() == 2) {
     						ExprNodeDesc child1 = childExprs.get(0);
     						ExprNodeDesc child2 = childExprs.get(1);
@@ -813,11 +813,11 @@ public class HookUtils {
     		break;
     		case FILESINK: {
     			FileSinkDesc fileSinkDesc = (FileSinkDesc) operator.getConf();
-    			textAppend(sb, "dirName", fileSinkDesc.getDirName());
+    			textAppend(sb, "dirName", fileSinkDesc.getDirName().toString());
     			if (fileSinkDesc.getDirName() != null &&
     					fileSinkDesc.getFinalDirName() != null &&
     					! fileSinkDesc.getDirName().equals(fileSinkDesc.getFinalDirName())) {
-    				textAppend(sb, "finalDirName", fileSinkDesc.getFinalDirName());
+    				textAppend(sb, "finalDirName", fileSinkDesc.getFinalDirName().toString());
     			}
     			textAppend(sb, "numFiles", fileSinkDesc.getNumFiles());
     			if (fileSinkDesc.getPartitionCols() != null) {
