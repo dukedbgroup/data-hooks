@@ -14,7 +14,7 @@ import java.sql.SQLException;
 public class JDBCConnector {
 	
 	private static String MySQLDriver = "com.mysql.jdbc.Driver";
-	private static String HiveDriver = "org.apache.hadoop.hive.jdbc.HiveDriver";
+	private static String HiveDriver = "org.apache.hive.jdbc.HiveDriver";
 
 	private static Connection connect(String connectionString, String userName, 
 			String password, String driverClass) {
