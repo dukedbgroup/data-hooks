@@ -6,13 +6,13 @@ import AssemblyKeys._
 object DataHooksBuild extends Build {
 
  // Hadoop version to build against.
- val HADOOP_VERSION = "1.2.1"
+ val HADOOP_VERSION = "2.6.0"
 
  // Spark version to build againt.
  val SPARK_VERSION = "1.0.1"
 
  // Hive version
- val HIVE_VERSION = "0.13.1"
+ val HIVE_VERSION = "1.2.0"
 
  lazy val root = Project(id = "DataHooks", base = file("."), settings = rootSettings) 
 
@@ -23,6 +23,9 @@ object DataHooksBuild extends Build {
    unmanagedJars in Compile <<= baseDirectory map { base => (base / "lib" ** "*.jar").classpath },
    
 //   resolvers += "spray repo" at "http://repo.spray.io",
+	resolvers ++= Seq(
+			"conjars.org" at "http://conjars.org/repo"
+		),
 
    libraryDependencies ++= Seq(
       "org.eclipse.jetty" % "jetty-server" % "7.6.8.v20121106",
@@ -43,7 +46,9 @@ object DataHooksBuild extends Build {
       "junit" % "junit" % "4.11" % "provided",
       "mysql" % "mysql-connector-java" % "5.1.35",
       "org.apache.spark" % "spark-core_2.10" % SPARK_VERSION % "provided",
-      "org.apache.hadoop" % "hadoop-core" % HADOOP_VERSION % "provided",
+      "org.apache.hadoop" % "hadoop-common" % HADOOP_VERSION % "provided",
+      "org.apache.hadoop" % "hadoop-mapreduce-client-core" % HADOOP_VERSION % "provided",
+      // "org.apache.hadoop" % "hadoop-core" % HADOOP_VERSION % "provided",
       "org.apache.hive" % "hive-exec" % HIVE_VERSION % "provided",
       "org.apache.hive" % "hive-metastore" % HIVE_VERSION % "provided"
   ),

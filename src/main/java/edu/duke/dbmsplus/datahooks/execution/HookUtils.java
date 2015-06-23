@@ -47,7 +47,6 @@ import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeFieldDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
-import org.apache.hadoop.hive.ql.plan.ExtractDesc;
 import org.apache.hadoop.hive.ql.plan.FileSinkDesc;
 import org.apache.hadoop.hive.ql.plan.FilterDesc;
 import org.apache.hadoop.hive.ql.plan.ForwardDesc;
@@ -703,8 +702,9 @@ public class HookUtils {
     			break;
     		}
     		case EXTRACT:
-    			ExtractDesc extractDesc = (ExtractDesc) operator.getConf();
-    			comment = "extract: " + extractDesc.getCol().getExprString();
+    			//ExtractDesc is removed on hive 1.2.0. HIVE-9416
+    			SelectDesc extractDesc = (SelectDesc) operator.getConf();
+    			comment = "extract: " + extractDesc.getColList().get(0).getExprString();
     			break;
     		case FILTER: {
     			FilterDesc filterDesc = (FilterDesc) operator.getConf();
@@ -943,7 +943,7 @@ public class HookUtils {
         }
 
         //condition expressions
-        Map<Byte, String> position2expr = desc.getExprsStringMap();
+        Map<Byte, String> position2expr = desc.getFiltersStringMap();
         if (position2expr != null) {
             for (int i=0; i<5; i++) {
                 String v = position2expr.get(i);
