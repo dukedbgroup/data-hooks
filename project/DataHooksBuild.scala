@@ -50,7 +50,8 @@ object DataHooksBuild extends Build {
       "org.apache.hadoop" % "hadoop-mapreduce-client-core" % HADOOP_VERSION % "provided",
       // "org.apache.hadoop" % "hadoop-core" % HADOOP_VERSION % "provided",
       "org.apache.hive" % "hive-exec" % HIVE_VERSION % "provided",
-      "org.apache.hive" % "hive-metastore" % HIVE_VERSION % "provided"
+      "org.apache.hive" % "hive-metastore" % HIVE_VERSION % "provided",
+      "org.glassfish.jersey.media" % "jersey-media-json-jackson" % "2.19"
   ),
   publish := {}
  ) ++ extraAssemblySettings
