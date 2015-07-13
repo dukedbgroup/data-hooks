@@ -51,7 +51,9 @@ object DataHooksBuild extends Build {
       // "org.apache.hadoop" % "hadoop-core" % HADOOP_VERSION % "provided",
       "org.apache.hive" % "hive-exec" % HIVE_VERSION % "provided",
       "org.apache.hive" % "hive-metastore" % HIVE_VERSION % "provided",
-      "org.glassfish.jersey.media" % "jersey-media-json-jackson" % "2.19"
+      "org.codehaus.jackson" % "jackson-mapper-asl" % "1.9.0",
+      "org.codehaus.jackson" % "jackson-core-asl" % "1.9.0",
+      "org.apache.httpcomponents" % "httpclient" % "4.3.6"
   ),
   publish := {}
  ) ++ extraAssemblySettings
