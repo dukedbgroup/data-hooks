@@ -1,4 +1,4 @@
-package edu.duke.dbmsplus.datahooks.yarnmetrics.listener;
+package edu.duke.dbmsplus.datahooks.yarnmetrics.statsd;
 
 import com.timgroup.statsd.NonBlockingStatsDClient;
 import com.timgroup.statsd.StatsDClient;
@@ -6,7 +6,7 @@ import com.timgroup.statsd.StatsDClient;
 /**
  * Created by rahulswaminathan on 4/1/15.
  */
-public class ApplicationLogger {
+public class StatsDLogger {
 
     private static final String PREFIX = "my.prefix";
     private static final String SERVER_LOCATION = "localhost";
@@ -16,7 +16,7 @@ public class ApplicationLogger {
     /**
      * Logger for sending application statistics to MySQL. Create an instance of this in the application, and then the methods can be used to log various statistics for analysis.
      */
-    public ApplicationLogger() {
+    public StatsDLogger() {
             statsd = new NonBlockingStatsDClient(PREFIX, SERVER_LOCATION, PORT);
     }
 

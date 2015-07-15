@@ -53,7 +53,8 @@ object DataHooksBuild extends Build {
       "org.apache.hive" % "hive-metastore" % HIVE_VERSION % "provided",
       "org.codehaus.jackson" % "jackson-mapper-asl" % "1.9.0",
       "org.codehaus.jackson" % "jackson-core-asl" % "1.9.0",
-      "org.apache.httpcomponents" % "httpclient" % "4.3.6"
+      "org.apache.httpcomponents" % "httpclient" % "4.3.6",
+      "com.timgroup" % "java-statsd-client" % "3.1.0"
   ),
   publish := {}
  ) ++ extraAssemblySettings

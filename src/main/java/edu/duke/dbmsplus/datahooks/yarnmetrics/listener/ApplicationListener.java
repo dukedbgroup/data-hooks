@@ -10,6 +10,7 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.Apps;
+import edu.duke.dbmsplus.datahooks.yarnmetrics.util.PropsParser;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -63,8 +64,8 @@ public abstract class ApplicationListener {
     }
 
     private String sendAppsGet(long startTime) throws Exception {
-        GetYarnMetrics y = new GetYarnMetrics();
-        String url = "http://" + y.getYarnWEBUI() + "/ws/v1/cluster/apps?startedTimeBegin=" + startTime;
+    	PropsParser pp = new PropsParser();
+        String url = "http://" + pp.getYarnWEBUI() + "/ws/v1/cluster/apps?startedTimeBegin=" + startTime;
         return sendGetToURL(url);
     }
 

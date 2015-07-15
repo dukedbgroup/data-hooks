@@ -4,6 +4,9 @@ import com.timgroup.statsd.NonBlockingStatsDClient;
 import com.timgroup.statsd.StatsDClient;
 
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.ClusterMetrics;
+import edu.duke.dbmsplus.datahooks.yarnmetrics.statsd.StatsDLogger;
+import edu.duke.dbmsplus.datahooks.yarnmetrics.util.HttpGetHandler;
+import edu.duke.dbmsplus.datahooks.yarnmetrics.util.PropsParser;
 
 import org.codehaus.jackson.map.ObjectMapper;
 
