@@ -7,6 +7,14 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import edu.duke.dbmsplus.datahooks.connection.JDBCConnector;
+import edu.duke.dbmsplus.datahooks.conf.MetadataDatabaseCredentials;
+
+/**
+ * Write Yarn metrics to MySQL database.
+ * @author rahulswaminathan, Xiaodan
+ *
+ */
 public class SQLWrapper {
 
 	Connection conn = null;
@@ -34,6 +42,13 @@ public class SQLWrapper {
         }
 
     }
+	
+	public SQLWrapper() {
+		conn = JDBCConnector.connectMySQL(
+				MetadataDatabaseCredentials.CONNECTION_STRING, 
+				MetadataDatabaseCredentials.USERNAME, 
+				MetadataDatabaseCredentials.PASSWORD);
+	}
 
     /**
      * Removes a row from the specified table.
@@ -56,12 +71,16 @@ public class SQLWrapper {
 
         return true;
     }
-
+    /**
+     * TODO: rewrite create table part, we need three tables at least: app, cluster, scheduler
+     * @param table
+     * @return
+     */
     public boolean createAppsTable(String table) {
         Statement statement;
         try {
             statement = conn.createStatement();
-            statement.executeUpdate("CREATE TABLE " + table + "(tag varchar(255), value varchar(255))");
+            statement.executeUpdate("CREATE TABLE IF NOT EXISTS" + table + "(tag varchar(255), value varchar(255))");
         }
         catch (SQLException e) {
             printSQLInformation(e);

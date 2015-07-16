@@ -29,6 +29,7 @@ public class ClusterMetrics {
         private long totalMB = 0;
         private long reservedVirtualCores = 0;
         private long availableVirtualCores = 0;
+        private long allocatedVirtualCores = 0;
         private long totalVirtualCores = 0;
         private int containersAllocated = 0;
         private int containersReserved = 0;
@@ -136,7 +137,15 @@ public class ClusterMetrics {
             this.availableVirtualCores = availableVirtualCores;
         }
 
-        public long getTotalVirtualCores() {
+        public long getAllocatedVirtualCores() {
+			return allocatedVirtualCores;
+		}
+
+		public void setAllocatedVirtualCores(long allocatedVirtualCores) {
+			this.allocatedVirtualCores = allocatedVirtualCores;
+		}
+
+		public long getTotalVirtualCores() {
             return totalVirtualCores;
         }
 

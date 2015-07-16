@@ -6,19 +6,21 @@ import java.util.*;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.statsd.StatsDReceiver;
 
 /**
- * Created by rahulswaminathan on 3/31/15.
- *  TODO use edu.duke.dbmsplus.datahooks.connection package
+ * StatsDSQLWriter uses SQLWrapper to write to MySQL database.
+ * @author rahulswaminathan, Xiaodan 
+ * TODO: Deal with counts.properties and gauges.properties.
+ * 
  */
 public class StatsDSQLWriter {
 
     private static final String PREFIX = "my.prefix";
-    private static final String SERVER_LOCATION = "localhost";
+//    private static final String SERVER_LOCATION = "localhost";
     private static final int PORT = 8125;
     private static final String COUNT_FILE = "counts.properties";
     private static final String GAUGE_FILE = "gauges.properties";
-    private static final String DATABASE_NAME = "test";
-    private static final String MYSQL_USERNAME = "root";
-    private static final String MYSQL_TABLE_NAME = "metrics";
+//    private static final String DATABASE_NAME = "test";
+//    private static final String MYSQL_USERNAME = "root";
+//    private static final String MYSQL_TABLE_NAME = "metrics";
     private Map<String, List<String>> tableNameToGaugesMap;
     private Map<String, List<String>> tableNameToCountsMap;
     private StatsDReceiver server;
@@ -44,7 +46,7 @@ public class StatsDSQLWriter {
 
         tableNameToCountsMap = readProperties(COUNT_FILE);
         tableNameToGaugesMap = readProperties(GAUGE_FILE);
-        mySQLWrapper = new SQLWrapper(DATABASE_NAME , SERVER_LOCATION, MYSQL_USERNAME);
+        mySQLWrapper = new SQLWrapper();
         initializeTable(tableNameToCountsMap);
         initializeTable(tableNameToGaugesMap);
     }
@@ -82,7 +84,7 @@ public class StatsDSQLWriter {
     }
 
     /**
-     * Prints the specified SQL table to the console.
+     * Prints the specified SQL table to the console. For test only.
      * @param tableName
      *          Table to be printed.
      */
