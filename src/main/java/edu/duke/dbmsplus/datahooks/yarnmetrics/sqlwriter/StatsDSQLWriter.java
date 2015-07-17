@@ -54,6 +54,8 @@ public class StatsDSQLWriter {
     private void initializeTable(Map<String, List<String>> tableToItemsMap) {
         for (String table : tableToItemsMap.keySet()) {
             List<String> items = tableToItemsMap.get(table);
+            //If the tables do not exist, create them here.
+            mySQLWrapper.createAppsTable(table);
             for (String item : items) {
                 mySQLWrapper.removeRow(table, item);
                 mySQLWrapper.insertIntoTable(table, item, 0);
