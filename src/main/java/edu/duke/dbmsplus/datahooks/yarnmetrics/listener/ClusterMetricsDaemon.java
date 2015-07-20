@@ -14,7 +14,10 @@ import java.util.Random;
 import java.lang.reflect.Field;
 
 /**
- * Created by rahulswaminathan on 1/30/15.
+ * This class listen to the change of cluster metrics.
+ * Write the metrics to MySQL.
+ * Send the changes of metrics to StatsD.
+ * @author rahulswaminathan, Xiaodan
  */
 public class ClusterMetricsDaemon {
 
