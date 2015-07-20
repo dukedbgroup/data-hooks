@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.Apps;
+import edu.duke.dbmsplus.datahooks.yarnmetrics.sqlwriter.SQLWrapper;
 
 /**
  * Created by rahulswaminathan on 1/14/15.

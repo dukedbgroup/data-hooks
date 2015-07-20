@@ -18,31 +18,11 @@ import edu.duke.dbmsplus.datahooks.conf.MetadataDatabaseCredentials;
 public class SQLWrapper {
 
 	Connection conn = null;
-
-	/**
-	 * A wrapper for MySQL. This can simplify writing to a MySQL database.
-	 * 
-	 * @param databaseName
-	 *            Name of the database being written to.
-	 * @param host
-	 *            Host of the MySQL server. Typically localhost.
-	 * @param user
-	 *            Username for the MySQL server.
-	 */
-	public SQLWrapper(String databaseName, String host, String user) {
-		try {
-			Class.forName("com.mysql.jdbc.Driver").newInstance();
-
-			conn = DriverManager.getConnection("jdbc:mysql://" + host + "/"
-					+ databaseName + "?" + "user=" + user);
-		} catch (SQLException e) {
-			printSQLInformation(e);
-		} catch (Exception e) {
-            e.printStackTrace();
-        }
-
-    }
 	
+	/**
+	 * Use JDBCConector to connect to MySQL
+	 * @author Xiaodan
+	 */
 	public SQLWrapper() {
 		conn = JDBCConnector.connectMySQL(
 				MetadataDatabaseCredentials.CONNECTION_STRING, 
@@ -50,45 +30,45 @@ public class SQLWrapper {
 				MetadataDatabaseCredentials.PASSWORD);
 	}
 
-    /**
-     * Removes a row from the specified table.
-     * @param table
-     *          Table to remove row from.
-     * @param tag
-     *          Tag value of the row to be removed
-     * @return
-     *          True if row removed, false otherwise.
-     */
-    public boolean removeRow(String table, String tag) {
-        Statement statement;
-        try {
-            statement = conn.createStatement();
-            statement.executeUpdate("DELETE from " + table + " WHERE tag='" + tag + "'");
-        } catch (SQLException e) {
-            //printSQLInformation(e);
-            return false;
-        }
+	/**
+	 * Removes a row from the specified table.
+	 * @param table
+	 *          Table to remove row from.
+	 * @param tag
+	 *          Tag value of the row to be removed
+	 * @return
+	 *          True if row removed, false otherwise.
+	 */
+	public boolean removeRow(String table, String tag) {
+		Statement statement;
+		try {
+			statement = conn.createStatement();
+			statement.executeUpdate("DELETE from " + table + " WHERE tag='" + tag + "'");
+		} catch (SQLException e) {
+			//printSQLInformation(e);
+			return false;
+		}
 
-        return true;
-    }
-    /**
-     * TODO: rewrite create table part, we need three tables at least: app, cluster, scheduler
-     * @param table
-     * @return
-     */
-    public boolean createAppsTable(String table) {
-        Statement statement;
-        try {
-            statement = conn.createStatement();
-            statement.executeUpdate("CREATE TABLE IF NOT EXISTS" + table + "(tag varchar(255), value varchar(255))");
-        }
-        catch (SQLException e) {
-            printSQLInformation(e);
-            return false;
-        }
+		return true;
+	}
+	/**
+	 * TODO: rewrite create table part, we need three tables at least: app, cluster, scheduler
+	 * @param table
+	 * @return
+	 */
+	public boolean createAppsTable(String table) {
+		Statement statement;
+		try {
+			statement = conn.createStatement();
+			statement.executeUpdate("CREATE TABLE IF NOT EXISTS" + table + "(tag varchar(255), value varchar(255))");
+		}
+		catch (SQLException e) {
+			printSQLInformation(e);
+			return false;
+		}
 
-        return true;
-    }
+		return true;
+	}
 	/**
 	 * Updates a value in a given table, assuming that the table has two
 	 * columns, the first of which is a string, and the second is an integer.
@@ -108,40 +88,40 @@ public class SQLWrapper {
 			statement.executeUpdate("UPDATE " + table + " SET value="
 					+ newValue + " WHERE tag='" + tag + "'");
 		}
-         catch (SQLException e) {
-            printSQLInformation(e);
-            return false;
-        }
+		catch (SQLException e) {
+			printSQLInformation(e);
+			return false;
+		}
 
 		return true;
 	}
 
-    /**
-     * Updates a value in a given table, assuming that the table has two
-     * columns, the first of which is a string, and the second is an string.
-     *
-     * @param table
-     *            Table to be updated
-     * @param tag
-     *            Tag to be updated.
-     * @param newValue
-     *            New value of the given tag.
-     * @return True on success, false otherwise.
-     */
-    public boolean updateValue(String table, String tag, String newValue) {
-        Statement statement;
-        try {
-            statement = conn.createStatement();
-            statement.executeUpdate("UPDATE " + table + " SET value='"
-                    + newValue + "' WHERE tag='" + tag + "'");
-        }
-        catch (SQLException e) {
-            printSQLInformation(e);
-            return false;
-        }
+	/**
+	 * Updates a value in a given table, assuming that the table has two
+	 * columns, the first of which is a string, and the second is an string.
+	 *
+	 * @param table
+	 *            Table to be updated
+	 * @param tag
+	 *            Tag to be updated.
+	 * @param newValue
+	 *            New value of the given tag.
+	 * @return True on success, false otherwise.
+	 */
+	public boolean updateValue(String table, String tag, String newValue) {
+		Statement statement;
+		try {
+			statement = conn.createStatement();
+			statement.executeUpdate("UPDATE " + table + " SET value='"
+					+ newValue + "' WHERE tag='" + tag + "'");
+		}
+		catch (SQLException e) {
+			printSQLInformation(e);
+			return false;
+		}
 
-        return true;
-    }
+		return true;
+	}
 
 	/**
 	 * Inserts a value into a given table, assuming that the table has two
@@ -162,7 +142,7 @@ public class SQLWrapper {
 			statement.executeUpdate("INSERT INTO " + table + " " + "VALUES ('"
 					+ tag + "', " + value + ")");
 		} catch (SQLException e) {
-            printSQLInformation(e);
+			printSQLInformation(e);
 			return false;
 		}
 
@@ -170,31 +150,31 @@ public class SQLWrapper {
 	}
 
 
-    /**
-     * Inserts a value into a given table, assuming that the table has two
-     * columns, the first of which is a string, and the second is an string.
-     *
-     * @param table
-     *            Table to be edited.
-     * @param tag
-     *            First column of a table
-     * @param value
-     *            Second column of a table
-     * @return True on success, false otherwise.
-     */
-    public boolean insertIntoTable(String table, String tag, String value) {
-        Statement statement;
-        try {
-            statement = conn.createStatement();
-            statement.executeUpdate("INSERT INTO " + table + " " + "VALUES ('"
-                    + tag + "', '" + value + "')");
-        } catch (SQLException e) {
-            printSQLInformation(e);
-            return false;
-        }
+	/**
+	 * Inserts a value into a given table, assuming that the table has two
+	 * columns, the first of which is a string, and the second is an string.
+	 *
+	 * @param table
+	 *            Table to be edited.
+	 * @param tag
+	 *            First column of a table
+	 * @param value
+	 *            Second column of a table
+	 * @return True on success, false otherwise.
+	 */
+	public boolean insertIntoTable(String table, String tag, String value) {
+		Statement statement;
+		try {
+			statement = conn.createStatement();
+			statement.executeUpdate("INSERT INTO " + table + " " + "VALUES ('"
+					+ tag + "', '" + value + "')");
+		} catch (SQLException e) {
+			printSQLInformation(e);
+			return false;
+		}
 
-        return true;
-    }
+		return true;
+	}
 
 	/**
 	 * Prints the given table to the console.
@@ -243,5 +223,22 @@ public class SQLWrapper {
 		System.out.println("SQLException: " + ex.getMessage());
 		System.out.println("SQLState: " + ex.getSQLState());
 		System.out.println("VendorError: " + ex.getErrorCode());
+	}
+	/**
+	 * Create Cluster Table.
+	 * @return
+	 */
+	public boolean createClusterTable(){
+		Statement statement;
+		try {
+			statement = conn.createStatement();
+			statement.executeUpdate("CREATE TABLE IF NOT EXISTS "
+			+ "Cluster_metrics" + "(Metrics varchar(255), Time TIMESTAMP(), value varchar(255))");
+		}
+		catch (SQLException e) {
+			printSQLInformation(e);
+			return false;
+		}
+		return true;
 	}
 }

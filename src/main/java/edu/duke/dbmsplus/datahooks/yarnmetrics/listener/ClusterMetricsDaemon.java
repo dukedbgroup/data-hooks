@@ -11,6 +11,7 @@ import edu.duke.dbmsplus.datahooks.yarnmetrics.util.PropsParser;
 import org.codehaus.jackson.map.ObjectMapper;
 
 import java.util.Random;
+import java.lang.reflect.Field;
 
 /**
  * Created by rahulswaminathan on 1/30/15.
@@ -38,11 +39,19 @@ public class ClusterMetricsDaemon {
 class ClusterMetricsThread implements Runnable {
 
     private volatile boolean running = true;
+    private ClusterMetrics current;
     private static int WAIT_TIME = 1000;
     private StatsDLogger logger;
 
     public ClusterMetricsThread() {
         logger = new StatsDLogger();
+    }
+    
+    private void initCurrent(HttpGetHandler hgh) {
+    	String clusterMetricsResponse1 = hgh.sendGet();
+        ObjectMapper mapper1 = new ObjectMapper();
+        current = mapper1.readValue(clusterMetricsResponse1, ClusterMetrics.class);
+        System.out.println(clusterMetricsResponse1);
     }
 
     public void run() {
@@ -51,15 +60,18 @@ class ClusterMetricsThread implements Runnable {
         String url = "http://" + pp.getYarnWEBUI() + "/ws/v1/cluster/metrics";
         HttpGetHandler hgh = new HttpGetHandler(url);
         System.out.println("Cluster metrics daemon is running");
+        initCurrent(hgh);
+        
         while (running) {
             try {
                 Thread.sleep(WAIT_TIME);
                 String clusterMetricsResponse = hgh.sendGet();
                 ObjectMapper mapper = new ObjectMapper();
                 ClusterMetrics metrics = mapper.readValue(clusterMetricsResponse, ClusterMetrics.class);
-
+                updateClusterTable(current, metrics);
+                current = metrics;
                 //System.out.println(clusterMetricsResponse);
-
+                
                 logger.logGauge("allocatedMB", (int) metrics.getClusterMetrics().getAllocatedMB());
                 logger.logGauge("appsCompleted", metrics.getClusterMetrics().getAppsCompleted());
                 logger.logGauge("appsSubmitted", metrics.getClusterMetrics().getAppsSubmitted());
@@ -76,5 +88,23 @@ class ClusterMetricsThread implements Runnable {
             }
         }
         System.out.println("while loop in cluster metrics daemon exited for some reason");
+    }
+    
+    private void updateClusterTable(ClusterMetrics oldMetrics, ClusterMetrics newMetrics) throws Exception {
+    	Class cls = oldMetrics.getClusterMetrics().getClass();
+    	Field[] fields = cls.getDeclaredFields();
+    	long startTime = System.currentTimeMillis();
+    	for (int i = 0; i < fields.length - 1; i++) {
+//    		System.out.println(f.toString());
+    		fields[i].setAccessible(true);
+    		Object oldVal = fields[i].get(oldMetrics.getClusterMetrics());
+//    		System.out.println(oldVal.toString());
+    		Object newVal = fields[i].get(newMetrics.getClusterMetrics());
+//    		System.out.println(oldVal +"===" + newVal);
+    		if (!oldVal.toString().equals(newVal.toString())) {
+    			//TODO: update to MySQL
+    			System.out.println("Update: The field:" + fields[i].getName() + "\nold value: " + oldVal +" \nnew value: " + newVal + "\nTime:" + startTime);
+    		}
+    	}
     }
 }
