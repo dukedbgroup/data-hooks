@@ -19,19 +19,20 @@ public class MonitorApplicationsDaemon {
     private static final String TIMESTAMP = "__timeStamp";
     private static final String ELAPSED_TIME = "__elapsedTime";
     private static final String ALLOCATED_MB = "__allocatedMB";
-    private static final String DATABASE_NAME = "test";
-    private static final String MYSQL_USERNAME = "root";
-    private static final String SERVER_LOCATION = "localhost";
+//    private static final String DATABASE_NAME = "test";
+//    private static final String MYSQL_USERNAME = "root";
+//    private static final String SERVER_LOCATION = "localhost";
     private SQLWrapper mySqlWrapper;
+    private ApplicationListener myAppListener;
 
     public MonitorApplicationsDaemon() {
-        mySqlWrapper = new SQLWrapper(DATABASE_NAME , SERVER_LOCATION, MYSQL_USERNAME);
+        mySqlWrapper = new SQLWrapper();
     }
 
     public void run() {
         System.out.println("monitor applications daemon is running");
 
-        ApplicationListener myAppListener = new ApplicationListener() {
+        myAppListener = new ApplicationListener() {
             @Override
             public void onAppBegin(Apps.app app) {
                     mySqlWrapper.createAppsTable(app.getId());
@@ -57,6 +58,10 @@ public class MonitorApplicationsDaemon {
 
         myAppListener.startListening();
     }
+    
+    public void stop() {
+    	myAppListener.stopListening();
+	}
 
     private void initializeSQLTable(Apps.app app) {
         mySqlWrapper.insertIntoTable(app.getId(),  app.getId() + QUEUE, app.getQueue());

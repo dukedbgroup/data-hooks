@@ -6,26 +6,45 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.Scheduler;
+import edu.duke.dbmsplus.datahooks.yarnmetrics.statsd.StatsDLogger;
+import edu.duke.dbmsplus.datahooks.yarnmetrics.util.HttpGetHandler;
+import edu.duke.dbmsplus.datahooks.yarnmetrics.util.PropsParser;
 
 import java.util.Random;
 
 /**
- * Created by rahulswaminathan on 1/30/15.
+ * A daemon that gathers information about the scheduler from the RM rest api. 
+ * The run method launches a new thread that gathers information periodically 
+ * and posts messages to statsd using the logging api.
+ * @author rahulswaminathan, Xiaodan
  */
 public class SchedulerDaemon {
 
-    /**
-     * A daemon that gathers information about the scheduler from the RM rest api. The run method launches a new thread
-     * that gathers information periodically and posts messages to statsd using the logging api.
-     */
+	private SchedulerThread runnable;
+    private Thread thread;
+    
     public SchedulerDaemon() {
 
     }
 
     public void run() {
-        Runnable run = new SchedulerThread();
-        new Thread(run).start();
+        runnable = new SchedulerThread();
+        new Thread(runnable).start();
+        thread = new Thread(runnable);
+        thread.start();
     }
+
+	public void stop() {
+		if (thread != null) {
+			runnable.terminate();
+		}
+	    try {
+	         thread.join();
+	         } 
+	    catch (InterruptedException e) {
+	         e.printStackTrace();
+	         }
+	}
 }
 
 class SchedulerThread implements Runnable {
@@ -39,7 +58,13 @@ class SchedulerThread implements Runnable {
     }
 
 
-    public void run() {
+    public void terminate() {
+		// TODO Auto-generated method stub
+		running = false;
+	}
+
+
+	public void run() {
         PropsParser pp = new PropsParser();
         String url = "http://" + pp.getYarnWEBUI() + "/ws/v1/cluster/scheduler";
         HttpGetHandler hgh = new HttpGetHandler(url);

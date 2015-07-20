@@ -3,6 +3,7 @@ package edu.duke.dbmsplus.datahooks.yarnmetrics.listener;
 import com.timgroup.statsd.NonBlockingStatsDClient;
 import com.timgroup.statsd.StatsDClient;
 
+import edu.duke.dbmsplus.datahooks.yarnmetrics.listener.ApplicationListener.AppThread;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.ClusterMetrics;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.statsd.StatsDLogger;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.util.HttpGetHandler;
@@ -24,6 +25,8 @@ public class ClusterMetricsDaemon {
     private static final String PREFIX = "my.prefix";
     private static final String SERVER_LOCATION = "localhost";
     private static final int PORT = 8125;
+    private ClusterMetricsThread runnable;
+    private Thread thread;
 
     /**
      * Daemon that uses the RM rest api to get information pertaining to cluster metrics. The daemon is started using the
@@ -34,9 +37,22 @@ public class ClusterMetricsDaemon {
     }
 
     public void run() {
-        Runnable run = new ClusterMetricsThread();
-        new Thread(run).start();
+        runnable = new ClusterMetricsThread();
+        new Thread(runnable).start();
+        thread = new Thread(runnable);
+        thread.start();
     }
+
+	public void stop() {
+		if (thread != null) {
+            runnable.terminate();
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+	}
 }
 
 class ClusterMetricsThread implements Runnable {
@@ -51,10 +67,15 @@ class ClusterMetricsThread implements Runnable {
     }
     
     private void initCurrent(HttpGetHandler hgh) {
+    	try {
     	String clusterMetricsResponse1 = hgh.sendGet();
         ObjectMapper mapper1 = new ObjectMapper();
         current = mapper1.readValue(clusterMetricsResponse1, ClusterMetrics.class);
         System.out.println(clusterMetricsResponse1);
+    	}
+    	catch (Exception e) {
+    		e.printStackTrace();
+    	}
     }
 
     public void run() {
@@ -109,5 +130,8 @@ class ClusterMetricsThread implements Runnable {
     			System.out.println("Update: The field:" + fields[i].getName() + "\nold value: " + oldVal +" \nnew value: " + newVal + "\nTime:" + startTime);
     		}
     	}
+    }
+    public void terminate() {
+    	running = false;
     }
 }

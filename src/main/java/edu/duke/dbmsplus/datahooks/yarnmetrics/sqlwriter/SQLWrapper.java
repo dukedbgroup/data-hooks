@@ -60,7 +60,7 @@ public class SQLWrapper {
 		Statement statement;
 		try {
 			statement = conn.createStatement();
-			statement.executeUpdate("CREATE TABLE IF NOT EXISTS" + table + "(tag varchar(255), value varchar(255))");
+			statement.executeUpdate("CREATE TABLE IF NOT EXISTS " + table + "(tag varchar(255), value varchar(255))");
 		}
 		catch (SQLException e) {
 			printSQLInformation(e);

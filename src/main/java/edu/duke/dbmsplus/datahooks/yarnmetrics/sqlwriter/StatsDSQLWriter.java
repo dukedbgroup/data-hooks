@@ -25,6 +25,8 @@ public class StatsDSQLWriter {
     private Map<String, List<String>> tableNameToCountsMap;
     private StatsDReceiver server;
     private SQLWrapper mySQLWrapper;
+    private StatsDSQLWriterThread runnable;
+    private Thread thread;
 
     /**
      * Writes the data collected from the StatsDReceiver to SQL.
@@ -37,8 +39,21 @@ public class StatsDSQLWriter {
      * Runs the StatsDSqlWriter thread.
      */
     public void run() {
-        Runnable run = new StatsDSQLWriterThread();
-        new Thread(run).start();
+        runnable = new StatsDSQLWriterThread();
+        thread = new Thread(runnable);
+        thread.start();
+    }
+    
+    public void stop() {
+    	if (thread != null) {
+			runnable.terminate();
+		}
+	    try {
+	         thread.join();
+	         } 
+	    catch (InterruptedException e) {
+	         e.printStackTrace();
+	         }
     }
 
     private void initialize() {
@@ -98,9 +113,11 @@ public class StatsDSQLWriter {
      * Thread that runs consistently to pull data from the StatsDReceiver and saves it into MySQL using the SQLWrapper.
      */
     class StatsDSQLWriterThread implements Runnable {
+    	
+    	private volatile boolean running = true;
 
         public void run() {
-            while (true) {
+            while (running) {
                 server.waitForMessage();
 
                 try {
@@ -119,7 +136,12 @@ public class StatsDSQLWriter {
                 }
             }
         }
-        private void updateGaugeValues() {
+        public void terminate() {
+			// TODO Auto-generated method stub
+        	running = false;
+			
+		}
+		private void updateGaugeValues() {
             for (String table : tableNameToGaugesMap.keySet()) {
                 List<String> gauges = tableNameToGaugesMap.get(table);
                 for (String gauge : gauges) {
@@ -135,5 +157,5 @@ public class StatsDSQLWriter {
                 }
             }
         }
-    }
+    }	
 }
