@@ -1,5 +1,6 @@
 package edu.duke.dbmsplus.datahooks.yarnmetrics.sqlwriter;
 
+import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -52,11 +53,11 @@ public class SQLWrapper {
 		return true;
 	}
 	/**
-	 * TODO: rewrite create table part, we need three tables at least: app, cluster, scheduler
+	 * create tables for statsD output.
 	 * @param table
 	 * @return
 	 */
-	public boolean createAppsTable(String table) {
+	public boolean createTable(String table) {
 		Statement statement;
 		try {
 			statement = conn.createStatement();
@@ -69,6 +70,8 @@ public class SQLWrapper {
 
 		return true;
 	}
+	
+	
 	/**
 	 * Updates a value in a given table, assuming that the table has two
 	 * columns, the first of which is a string, and the second is an integer.
@@ -175,9 +178,41 @@ public class SQLWrapper {
 
 		return true;
 	}
+	
+	/**
+	 * Create Cluster metrics Table.
+	 * @return
+	 */
+	public boolean createClusterTable(){
+		Statement statement;
+		try {
+			statement = conn.createStatement();
+			statement.executeUpdate("CREATE TABLE IF NOT EXISTS "
+			+ "cluster_metrics" + "(MetricsName varchar(255), RecordTime bigint(20), Value varchar(255))");
+		}
+		catch (SQLException e) {
+			printSQLInformation(e);
+			return false;
+		}
+		return true;
+	}
+	
+	public boolean writeClusterTable(String metricsName, long time, String value) {
+		Statement statement;
+		try {
+			statement = conn.createStatement();
+			statement.executeUpdate("INSERT INTO cluster_metrics VALUES" 
+			+ "('" + metricsName +"', '" + BigInteger.valueOf(time) + "', '"  + value + "')");
+		}
+		catch (SQLException e) {
+			printSQLInformation(e);
+			return false;
+		}
+		return true;
+	}
 
 	/**
-	 * Prints the given table to the console.
+	 * Prints the given table to the console. For test only
 	 * 
 	 * @param table
 	 *            Table to be printed.
@@ -219,26 +254,9 @@ public class SQLWrapper {
 
 	}
 
-	private void printSQLInformation(SQLException ex) {
+	protected void printSQLInformation(SQLException ex) {
 		System.out.println("SQLException: " + ex.getMessage());
 		System.out.println("SQLState: " + ex.getSQLState());
 		System.out.println("VendorError: " + ex.getErrorCode());
-	}
-	/**
-	 * Create Cluster Table.
-	 * @return
-	 */
-	public boolean createClusterTable(){
-		Statement statement;
-		try {
-			statement = conn.createStatement();
-			statement.executeUpdate("CREATE TABLE IF NOT EXISTS "
-			+ "Cluster_metrics" + "(Metrics varchar(255), Time TIMESTAMP(), value varchar(255))");
-		}
-		catch (SQLException e) {
-			printSQLInformation(e);
-			return false;
-		}
-		return true;
 	}
 }

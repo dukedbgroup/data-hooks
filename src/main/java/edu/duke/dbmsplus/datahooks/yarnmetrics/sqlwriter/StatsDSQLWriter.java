@@ -70,7 +70,7 @@ public class StatsDSQLWriter {
         for (String table : tableToItemsMap.keySet()) {
             List<String> items = tableToItemsMap.get(table);
             //If the tables do not exist, create them here.
-            mySQLWrapper.createAppsTable(table);
+            mySQLWrapper.createTable(table);
             for (String item : items) {
                 mySQLWrapper.removeRow(table, item);
                 mySQLWrapper.insertIntoTable(table, item, 0);

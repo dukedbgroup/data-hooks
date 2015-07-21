@@ -5,6 +5,7 @@ import com.timgroup.statsd.StatsDClient;
 
 import edu.duke.dbmsplus.datahooks.yarnmetrics.listener.ApplicationListener.AppThread;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.ClusterMetrics;
+import edu.duke.dbmsplus.datahooks.yarnmetrics.sqlwriter.SQLWrapper;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.statsd.StatsDLogger;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.util.HttpGetHandler;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.util.PropsParser;
@@ -38,7 +39,6 @@ public class ClusterMetricsDaemon {
 
     public void run() {
         runnable = new ClusterMetricsThread();
-        new Thread(runnable).start();
         thread = new Thread(runnable);
         thread.start();
     }
@@ -58,20 +58,25 @@ public class ClusterMetricsDaemon {
 class ClusterMetricsThread implements Runnable {
 
     private volatile boolean running = true;
+    /*
+     * record the state of last time
+     */
     private ClusterMetrics current;
-    private static int WAIT_TIME = 1000;
+    private static int WAIT_TIME = 50;
     private StatsDLogger logger;
+    private SQLWrapper ClusterMetricsWriter;
 
     public ClusterMetricsThread() {
         logger = new StatsDLogger();
+        ClusterMetricsWriter = new SQLWrapper();
     }
     
     private void initCurrent(HttpGetHandler hgh) {
     	try {
-    	String clusterMetricsResponse1 = hgh.sendGet();
-        ObjectMapper mapper1 = new ObjectMapper();
-        current = mapper1.readValue(clusterMetricsResponse1, ClusterMetrics.class);
-        System.out.println(clusterMetricsResponse1);
+    	String clusterMetricsResponse = hgh.sendGet();
+        ObjectMapper mapper = new ObjectMapper();
+        current = mapper.readValue(clusterMetricsResponse, ClusterMetrics.class);
+//        System.out.println(clusterMetricsResponse);
     	}
     	catch (Exception e) {
     		e.printStackTrace();
@@ -84,6 +89,7 @@ class ClusterMetricsThread implements Runnable {
         String url = "http://" + pp.getYarnWEBUI() + "/ws/v1/cluster/metrics";
         HttpGetHandler hgh = new HttpGetHandler(url);
         System.out.println("Cluster metrics daemon is running");
+        ClusterMetricsWriter.createClusterTable();
         initCurrent(hgh);
         
         while (running) {
@@ -117,7 +123,7 @@ class ClusterMetricsThread implements Runnable {
     private void updateClusterTable(ClusterMetrics oldMetrics, ClusterMetrics newMetrics) throws Exception {
     	Class cls = oldMetrics.getClusterMetrics().getClass();
     	Field[] fields = cls.getDeclaredFields();
-    	long startTime = System.currentTimeMillis();
+    	long recordTime = System.currentTimeMillis();
     	for (int i = 0; i < fields.length - 1; i++) {
 //    		System.out.println(f.toString());
     		fields[i].setAccessible(true);
@@ -127,7 +133,8 @@ class ClusterMetricsThread implements Runnable {
 //    		System.out.println(oldVal +"===" + newVal);
     		if (!oldVal.toString().equals(newVal.toString())) {
     			//TODO: update to MySQL
-    			System.out.println("Update: The field:" + fields[i].getName() + "\nold value: " + oldVal +" \nnew value: " + newVal + "\nTime:" + startTime);
+    			ClusterMetricsWriter.writeClusterTable(fields[i].getName(), recordTime, newVal.toString());
+//    			System.out.println("Update: The field:" + fields[i].getName() + "\nold value: " + oldVal +" \nnew value: " + newVal + "\nTime:" + startTime);
     		}
     	}
     }

@@ -35,7 +35,7 @@ public class MonitorApplicationsDaemon {
         myAppListener = new ApplicationListener() {
             @Override
             public void onAppBegin(Apps.app app) {
-                    mySqlWrapper.createAppsTable(app.getId());
+                    mySqlWrapper.createTable(app.getId());
                     initializeSQLTable(app);
                     updateSQLInfo(app);
             }

@@ -29,7 +29,6 @@ public class SchedulerDaemon {
 
     public void run() {
         runnable = new SchedulerThread();
-        new Thread(runnable).start();
         thread = new Thread(runnable);
         thread.start();
     }
