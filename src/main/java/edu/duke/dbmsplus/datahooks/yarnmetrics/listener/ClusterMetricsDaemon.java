@@ -64,11 +64,11 @@ class ClusterMetricsThread implements Runnable {
     private ClusterMetrics current;
     private static int WAIT_TIME = 50;
     private StatsDLogger logger;
-    private SQLWrapper ClusterMetricsWriter;
+    private SQLWrapper clusterMetricsWriter;
 
     public ClusterMetricsThread() {
         logger = new StatsDLogger();
-        ClusterMetricsWriter = new SQLWrapper();
+        clusterMetricsWriter = new SQLWrapper();
     }
     
     private void initCurrent(HttpGetHandler hgh) {
@@ -89,7 +89,7 @@ class ClusterMetricsThread implements Runnable {
         String url = "http://" + pp.getYarnWEBUI() + "/ws/v1/cluster/metrics";
         HttpGetHandler hgh = new HttpGetHandler(url);
         System.out.println("Cluster metrics daemon is running");
-        ClusterMetricsWriter.createClusterTable();
+        clusterMetricsWriter.createClusterTable();
         initCurrent(hgh);
         
         while (running) {
@@ -133,7 +133,7 @@ class ClusterMetricsThread implements Runnable {
 //    		System.out.println(oldVal +"===" + newVal);
     		if (!oldVal.toString().equals(newVal.toString())) {
     			//TODO: update to MySQL
-    			ClusterMetricsWriter.writeClusterTable(fields[i].getName(), recordTime, newVal.toString());
+    			clusterMetricsWriter.writeClusterTable(fields[i].getName(), recordTime, newVal.toString());
 //    			System.out.println("Update: The field:" + fields[i].getName() + "\nold value: " + oldVal +" \nnew value: " + newVal + "\nTime:" + startTime);
     		}
     	}

@@ -22,7 +22,7 @@ public class SQLWrapper {
 	
 	/**
 	 * Use JDBCConector to connect to MySQL
-	 * @author Xiaodan
+	 * @author rahulswaminathan, Xiaodan
 	 */
 	public SQLWrapper() {
 		conn = JDBCConnector.connectMySQL(
@@ -46,7 +46,7 @@ public class SQLWrapper {
 			statement = conn.createStatement();
 			statement.executeUpdate("DELETE from " + table + " WHERE tag='" + tag + "'");
 		} catch (SQLException e) {
-			//printSQLInformation(e);
+			printSQLInformation(e);
 			return false;
 		}
 
@@ -210,6 +210,34 @@ public class SQLWrapper {
 		}
 		return true;
 	}
+	
+	public boolean createSchedulerTable() {
+		Statement statement;
+		try {
+			statement = conn.createStatement();
+			statement.executeUpdate("CREATE TABLE IF NOT EXISTS "
+			+ "scheduler_metrics" + "(QueueName varchar(255), MetricsName varchar(255), RecordTime bigint(20), Value varchar(255))");
+		}
+		catch (SQLException e) {
+			printSQLInformation(e);
+			return false;
+		}
+		return true;
+	}
+	
+	public boolean writeSchedulerTable(String queueName, String metricsName, long time, String value) {
+		Statement statement;
+		try {
+			statement = conn.createStatement();
+			statement.executeUpdate("INSERT INTO scheduler_metrics VALUES" 
+			+ "('" + queueName +"','" + metricsName +"', '" + BigInteger.valueOf(time) + "', '"  + value + "')");
+		}
+		catch (SQLException e) {
+			printSQLInformation(e);
+			return false;
+		}
+		return true;
+	}
 
 	/**
 	 * Prints the given table to the console. For test only
@@ -258,5 +286,6 @@ public class SQLWrapper {
 		System.out.println("SQLException: " + ex.getMessage());
 		System.out.println("SQLState: " + ex.getSQLState());
 		System.out.println("VendorError: " + ex.getErrorCode());
+		ex.printStackTrace();
 	}
 }

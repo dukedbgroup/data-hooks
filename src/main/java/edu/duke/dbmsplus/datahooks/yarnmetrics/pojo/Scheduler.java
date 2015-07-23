@@ -112,7 +112,7 @@ public class Scheduler {
         private String usedResources;
         private String queueName;
         private String state;
-        private queue queues;
+        private queue[] queues;
         private resource resourcesUsed;
         private String type;
         private int numActiveApplications;
@@ -209,11 +209,11 @@ public class Scheduler {
             this.state = state;
         }
 
-        public queue getQueues() {
+        public queue[] getQueues() {
             return queues;
         }
 
-        public void setQueues(queue queues) {
+        public void setQueues(queue[] queues) {
             this.queues = queues;
         }
 
