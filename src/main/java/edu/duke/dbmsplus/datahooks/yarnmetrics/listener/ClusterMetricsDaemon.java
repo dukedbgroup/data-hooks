@@ -95,10 +95,11 @@ class ClusterMetricsThread implements Runnable {
         while (running) {
             try {
                 Thread.sleep(WAIT_TIME);
+                long recordTime = System.currentTimeMillis();
                 String clusterMetricsResponse = hgh.sendGet();
                 ObjectMapper mapper = new ObjectMapper();
                 ClusterMetrics metrics = mapper.readValue(clusterMetricsResponse, ClusterMetrics.class);
-                updateClusterTable(current, metrics);
+                updateClusterTable(current, metrics, recordTime);
                 current = metrics;
                 //System.out.println(clusterMetricsResponse);
                 
@@ -120,10 +121,10 @@ class ClusterMetricsThread implements Runnable {
         System.out.println("while loop in cluster metrics daemon exited for some reason");
     }
     
-    private void updateClusterTable(ClusterMetrics oldMetrics, ClusterMetrics newMetrics) throws Exception {
+    private void updateClusterTable(ClusterMetrics oldMetrics, ClusterMetrics newMetrics, long recordTime) throws Exception {
     	Class cls = oldMetrics.getClusterMetrics().getClass();
     	Field[] fields = cls.getDeclaredFields();
-    	long recordTime = System.currentTimeMillis();
+    	
     	for (int i = 0; i < fields.length - 1; i++) {
 //    		System.out.println(f.toString());
     		fields[i].setAccessible(true);

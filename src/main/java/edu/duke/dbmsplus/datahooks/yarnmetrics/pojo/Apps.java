@@ -5,13 +5,13 @@ package edu.duke.dbmsplus.datahooks.yarnmetrics.pojo;
 
 /**
  * POJO for Application object: /ws/v1/cluster/apps
+ * 
  * @author rahulswaminathan, Xiaodan
  */
 public class Apps {
     private apps apps;
 
-    public Apps() {
-    }
+    public Apps() {}
 
     public Apps.apps getApps() {
         return apps;
@@ -24,8 +24,7 @@ public class Apps {
     public static class apps {
         private app[] app;
 
-        public apps() {
-        }
+        public apps() {}
 
         public Apps.app[] getApp() {
             return app;
@@ -57,7 +56,7 @@ public class Apps {
         private int allocatedVCores;
         private int runningContainers;
 
-        public app(){
+        public app() {
 
         }
 
@@ -66,7 +65,7 @@ public class Apps {
         }
 
         public boolean equals(Object other) {
-            if (! (other instanceof Apps.app))
+            if (!(other instanceof Apps.app))
                 return false;
             Apps.app otherApp = (Apps.app) other;
             return this.hashCode() == otherApp.hashCode();

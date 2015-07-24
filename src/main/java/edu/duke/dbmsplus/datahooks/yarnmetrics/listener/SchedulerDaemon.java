@@ -92,10 +92,11 @@ class SchedulerThread implements Runnable {
         while (running) {
             try {
             	Thread.sleep(WAIT_TIME);
+            	long recordTime = System.currentTimeMillis();
                 String schedulerResponse = hgh.sendGet();
 //                System.out.println(schedulerResponse);
                 Scheduler.queue[] list = readClusterSchedulerJsonResponse(schedulerResponse);
-                updateSchedulerTable(lastState, list);
+                updateSchedulerTable(lastState, list, recordTime);
   
                 lastState = list;
                 
@@ -123,13 +124,12 @@ class SchedulerThread implements Runnable {
         return mapper.readValue(node.traverse(), typeRef);
     }
     
-    private void updateSchedulerTable(queue[] oldMetrics, queue[] newMetrics) throws Exception {
+    private void updateSchedulerTable(queue[] oldMetrics, queue[] newMetrics, long recordTime) throws Exception {
     	int length = oldMetrics.length;
     	//compare every queue
     	for (int i = 0; i < length; i++){
     		Class cls = oldMetrics[i].getClass();
-    		Field[] fields = cls.getDeclaredFields();
-    		long recordTime = System.currentTimeMillis();
+    		Field[] fields = cls.getDeclaredFields(); 		
     		String queueName = null;
     		//find queueName
     		for (int j = 0; j < fields.length; j++) {
@@ -184,36 +184,36 @@ class SchedulerThread implements Runnable {
 		}
     }
     
-    private void compareUser(user oldVal, user newVal, String queueName, long recordTime) {
-        if (oldVal == null && newVal != null) {
-        	System.out.println("new user comes!");
-        	System.out.println(newVal.getUsername() + "\n" + newVal.getNumActiveApplications() + "\n" + newVal.getNumActiveApplications());
+//    private void compareUser(user oldVal, user newVal, String queueName, long recordTime) {
+//        if (oldVal == null && newVal != null) {
+//        	System.out.println("new user comes!");
+//        	System.out.println(newVal.getUsername() + "\n" + newVal.getNumActiveApplications() + "\n" + newVal.getNumActiveApplications());
 //        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_username", recordTime, newVal.getUsername().toString());
 //        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_NumActiveApplications", recordTime, Integer.toString(newVal.getNumActiveApplications()));
 //        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_NumActiveApplications", recordTime, Integer.toString(newVal.getNumActiveApplications()));
-        }
-        else if (oldVal == null && newVal == null) {
-        	return;
-        }
-        else if (oldVal != null && newVal == null) {
-        	
-        }
-        else {
-	    	if (oldVal.getUsername() != newVal.getUsername()) {
+//        }
+//        else if (oldVal == null && newVal == null) {
+//        	return;
+//        }
+//        else if (oldVal != null && newVal == null) {
+//        	
+//        }
+//        else {
+//	    	if (oldVal.getUsername() != newVal.getUsername()) {
 //	        	System.out.println("users_username need to update!");
-	        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_username", recordTime, newVal.getUsername().toString());
-	        }
-	        if (oldVal.getNumActiveApplications() != newVal.getNumActiveApplications()) {	
+//	        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_username", recordTime, newVal.getUsername().toString());
+//	        }
+//	        if (oldVal.getNumActiveApplications() != newVal.getNumActiveApplications()) {	
 //	        	System.out.println("users_numActiveApplications need to update!");
-	        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_NumActiveApplications", recordTime, Integer.toString(newVal.getNumActiveApplications()));
-	        }
-	        if (oldVal.getNumPendingApplications() != newVal.getNumActiveApplications()) {
+//	        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_NumActiveApplications", recordTime, Integer.toString(newVal.getNumActiveApplications()));
+//	        }
+//	        if (oldVal.getNumPendingApplications() != newVal.getNumActiveApplications()) {
 //	        	System.out.println("users_numPendingApplications need to update!");
-	        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_NumActiveApplications", recordTime, Integer.toString(newVal.getNumActiveApplications()));
-	        }
-	        compareResourcesUsed(oldVal.getResourcesUsed(), newVal.getResourcesUsed(), queueName, recordTime);
-        }
-    }
+//	        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_NumActiveApplications", recordTime, Integer.toString(newVal.getNumActiveApplications()));
+//	        }
+//	        compareResourcesUsed(oldVal.getResourcesUsed(), newVal.getResourcesUsed(), queueName, recordTime);
+//        }
+//    }
     
 
     private int getTotalContainers(Scheduler.queue[] list) {
