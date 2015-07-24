@@ -177,6 +177,7 @@ class SchedulerThread implements Runnable {
 				compareResourcesUsed((resource)oldVal, (resource)newVal, queueName, recordTime);
     			}
     			else if (fields[j].getName() == "users") {
+    				//TODO: this part needs to rewrite.
 //				System.out.println("Compare users...");
 //				compareUser((user)oldVal, (user)newVal, queueName, recordTime);
     			}
