@@ -10,6 +10,7 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.Apps;
+import edu.duke.dbmsplus.datahooks.yarnmetrics.util.HttpGetHandler;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.util.PropsParser;
 
 import java.io.BufferedReader;
@@ -66,28 +67,11 @@ public abstract class ApplicationListener {
     private String sendAppsGet(long startTime) throws Exception {
     	PropsParser pp = new PropsParser();
         String url = "http://" + pp.getYarnWEBUI() + "/ws/v1/cluster/apps?startedTimeBegin=" + startTime;
-        return sendGetToURL(url);
+        HttpGetHandler hgh = new HttpGetHandler(url);
+        String appsResponse = hgh.sendGet();
+        return appsResponse;
     }
 
-    private String sendGetToURL(String url) throws Exception {
-        HttpClient client = new DefaultHttpClient();
-        HttpGet request = new HttpGet(url);
-
-        // add request header
-        request.addHeader("User-Agent", USER_AGENT);
-
-        HttpResponse response = client.execute(request);
-
-        BufferedReader rd = new BufferedReader(
-                new InputStreamReader(response.getEntity().getContent()));
-
-        StringBuffer result = new StringBuffer();
-        String line = "";
-        while ((line = rd.readLine()) != null) {
-            result.append(line);
-        }
-        return result.toString();
-    }
 
     private Apps.app[] readAppsJsonResponse(String appsJsonResponse) throws Exception {
         ObjectMapper mapper = new ObjectMapper();

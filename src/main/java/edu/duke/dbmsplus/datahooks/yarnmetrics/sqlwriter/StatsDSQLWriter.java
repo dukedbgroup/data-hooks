@@ -47,13 +47,12 @@ public class StatsDSQLWriter {
     public void stop() {
     	if (thread != null) {
 			runnable.terminate();
-		}
-	    try {
-	         thread.join();
-	         } 
-	    catch (InterruptedException e) {
-	         e.printStackTrace();
-	         }
+			try {
+		         thread.join();
+		    } catch (InterruptedException e) {
+		         e.printStackTrace();
+		    }
+		} 
     }
 
     private void initialize() {

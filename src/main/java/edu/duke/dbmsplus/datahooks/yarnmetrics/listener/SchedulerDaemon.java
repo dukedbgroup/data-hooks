@@ -68,7 +68,6 @@ class SchedulerThread implements Runnable {
 
 
     public void terminate() {
-		// TODO Auto-generated method stub
 		running = false;
 	}
     
@@ -97,36 +96,8 @@ class SchedulerThread implements Runnable {
 //                System.out.println(schedulerResponse);
                 Scheduler.queue[] list = readClusterSchedulerJsonResponse(schedulerResponse);
                 updateSchedulerTable(lastState, list);
-                
-//                for (int i = 0; i < lastState.length; i++) {
-//                	Class cls = lastState[i].getClass();
-//            		System.out.println("Metrics of current before:");
-//            		System.out.println(cls.toString());
-//            		Field[] fields = cls.getDeclaredFields();
-//            		System.out.println("length of Field:" + fields.length);
-//            		for (int j = 0; j < fields.length; j++) {
-//            			fields[j].setAccessible(true);
-//            			System.out.println("name:" + fields[j].getName() + " Val: "
-//            					+ fields[j].get(lastState[i]));
-//            				fields[j].setAccessible(true);
-//            			}
-//            		}
-                
+  
                 lastState = list;
-                
-//                for (int i = 0; i < lastState.length; i++) {
-//                	Class cls = lastState[i].getClass();
-//            		System.out.println("Metrics of current after:");
-//            		System.out.println(cls.toString());
-//            		Field[] fields = cls.getDeclaredFields();
-//            		System.out.println("length of Field:" + fields.length);
-//            		for (int j = 0; j < fields.length; j++) {
-//            			fields[j].setAccessible(true);
-//            			System.out.println("name:" + fields[j].getName() + " Val: "
-//            					+ fields[j].get(lastState[i]));
-//            				fields[j].setAccessible(true);
-//            			}
-//            		}
                 
                 logger.logGauge("totalContainers", getTotalContainers(list));
                 logger.logGauge("totalActiveApplications", getTotalActiveApplications(list));
@@ -139,6 +110,7 @@ class SchedulerThread implements Runnable {
                 e.printStackTrace();
             }
         }
+        System.out.println("Scheduler Listener existed.");
     }
 
     private Scheduler.queue[] readClusterSchedulerJsonResponse(String clusterSchedulerResponse) throws Exception {
