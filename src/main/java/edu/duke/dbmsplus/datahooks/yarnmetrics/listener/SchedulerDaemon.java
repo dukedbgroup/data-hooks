@@ -58,7 +58,7 @@ class SchedulerThread implements Runnable {
     private volatile boolean running = true;
     private static int WAIT_TIME = 250;
     private StatsDLogger logger;
-    private Scheduler.queue[] current;
+    private Scheduler.queue[] lastState;
     private SQLWrapper schedulerMetricsWriter;
 
     public SchedulerThread() {
@@ -75,7 +75,7 @@ class SchedulerThread implements Runnable {
     public void initCurrent(HttpGetHandler hgh){
     	String schedulerResponse = hgh.sendGet();
         try {
-			current = readClusterSchedulerJsonResponse(schedulerResponse);
+			lastState = readClusterSchedulerJsonResponse(schedulerResponse);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -92,19 +92,48 @@ class SchedulerThread implements Runnable {
 
         while (running) {
             try {
-                
+            	Thread.sleep(WAIT_TIME);
                 String schedulerResponse = hgh.sendGet();
-                System.out.println(schedulerResponse);
+//                System.out.println(schedulerResponse);
                 Scheduler.queue[] list = readClusterSchedulerJsonResponse(schedulerResponse);
-                updateSchedulerTable(current, list);
-                current = list;
+                updateSchedulerTable(lastState, list);
+                
+//                for (int i = 0; i < lastState.length; i++) {
+//                	Class cls = lastState[i].getClass();
+//            		System.out.println("Metrics of current before:");
+//            		System.out.println(cls.toString());
+//            		Field[] fields = cls.getDeclaredFields();
+//            		System.out.println("length of Field:" + fields.length);
+//            		for (int j = 0; j < fields.length; j++) {
+//            			fields[j].setAccessible(true);
+//            			System.out.println("name:" + fields[j].getName() + " Val: "
+//            					+ fields[j].get(lastState[i]));
+//            				fields[j].setAccessible(true);
+//            			}
+//            		}
+                
+                lastState = list;
+                
+//                for (int i = 0; i < lastState.length; i++) {
+//                	Class cls = lastState[i].getClass();
+//            		System.out.println("Metrics of current after:");
+//            		System.out.println(cls.toString());
+//            		Field[] fields = cls.getDeclaredFields();
+//            		System.out.println("length of Field:" + fields.length);
+//            		for (int j = 0; j < fields.length; j++) {
+//            			fields[j].setAccessible(true);
+//            			System.out.println("name:" + fields[j].getName() + " Val: "
+//            					+ fields[j].get(lastState[i]));
+//            				fields[j].setAccessible(true);
+//            			}
+//            		}
                 
                 logger.logGauge("totalContainers", getTotalContainers(list));
                 logger.logGauge("totalActiveApplications", getTotalActiveApplications(list));
                 logger.logGauge("totalApplications", getTotalApplications(list));
                 logger.logGauge("maxApplications", getMaxApplications(list));
                 /// SHOULD POST MESSAGES TO KAFKA
-                Thread.sleep(WAIT_TIME);
+               
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -127,10 +156,7 @@ class SchedulerThread implements Runnable {
     	//compare every queue
     	for (int i = 0; i < length; i++){
     		Class cls = oldMetrics[i].getClass();
-    		System.out.println("Metrics info:");
-    		System.out.println(cls.toString());
     		Field[] fields = cls.getDeclaredFields();
-    		System.out.println("length of Field:" + fields.length);
     		long recordTime = System.currentTimeMillis();
     		String queueName = null;
     		//find queueName
@@ -143,61 +169,79 @@ class SchedulerThread implements Runnable {
     		//Compare value of every field
     		for (int j = 0; j <fields.length; j++) {
     			fields[j].setAccessible(true);
-    			System.out.println(j + "th Type:" + fields[j].getType().toString() + "\nfield name:" + fields[j].getName() + "\nvalue:" + fields[j].get(oldMetrics[i]));
     			Object oldVal = fields[j].get(oldMetrics[i]);
     			Object newVal = fields[j].get(newMetrics[i]);
-    			if (oldVal == null || newVal == null) {
+    			
+    			if (fields[j].getName() == "resourcesUsed") {
+//				System.out.println("Compare resourcesUsed...");
+				compareResourcesUsed((resource)oldVal, (resource)newVal, queueName, recordTime);
+    			}
+    			else if (fields[j].getName() == "users") {
+//				System.out.println("Compare users...");
+//				compareUser((user)oldVal, (user)newVal, queueName, recordTime);
+    			}
+    			else if (oldVal == null || newVal == null) {
     				continue;
     			}
-    			//compare resource object
-    			else if (fields[j].getName().toString() == "resourcesUsed") {
-    				System.out.println("Compare resourcesUsed...");
-    				compareResourcesUsed((resource)oldVal, (resource)newVal, queueName, recordTime);
-    			}
-    			//compare user object
-    			else if (fields[j].getName().toString() == "user") {
-    				System.out.println("Compare resourcesUsed...");
-    				compareUser((user)oldVal, (user)newVal, queueName, recordTime);
-    			}
-    			//compare others
-    			else if (!oldVal.toString().equals(newVal.toString())){
-    				System.out.println("==========\nQueueName:" + queueName + "Update: The field:" + fields[j].getName() 
-    						+ "\nold value: " + oldVal +" \nnew value: " + newVal +
-    						"\nTime:" + recordTime + "\n==========");
-    				schedulerMetricsWriter.writeSchedulerTable(queueName, fields[j].getName(), recordTime, newVal.toString());
+    			else if(!(fields[j].get(oldMetrics[i]).toString().equals(fields[j].get(newMetrics[i]).toString()))) {
+//    				System.out.println("compare start------------------------");
+//        			System.out.println(j + "th Type:" + fields[j].getType().toString() +
+//        					"\nfield name:" + fields[j].getName() + "\noldvalue:" + 
+//        					fields[j].get(oldMetrics[i]) + "\nnewvalue:" + 
+//        					fields[j].get(newMetrics[i]));
+//        			System.out.println("compare end------------------------");
+        			schedulerMetricsWriter.writeSchedulerTable(queueName, fields[j].getName(), recordTime, newVal.toString());
     			}
     		}
     	}
     }
     
-    private void compareResourcesUsed(resource oldVal, resource newVal, String queueName, long recordTime) {
-    	if (!(oldVal.getMemory() == newVal.getMemory())){
-			//write to SQL
-			System.out.println("resourcesUsed need to update!");
+    private void compareResourcesUsed(resource oldVal, 
+    		resource newVal, String queueName, long recordTime) {
+    	if (oldVal == null || newVal == null) {
+    		return;
+    	}
+    	if (oldVal.getMemory() != newVal.getMemory()){
+//			System.out.println("resourcesUsed_memory need to update!");
 			schedulerMetricsWriter.writeSchedulerTable(queueName, "resourcesUsed_memory", recordTime, Integer.toString(newVal.getMemory()));
 		}
-		if (!(oldVal.getvCores() == newVal.getvCores())){
-			//write to SQL
-			System.out.println("resourcesUsed need to update!");
+		if (oldVal.getvCores() != newVal.getvCores()){
+//			System.out.println("resourcesUsed_vCores need to update!");
 			schedulerMetricsWriter.writeSchedulerTable(queueName, "resourcesUsed_vCores", recordTime, Integer.toString(newVal.getvCores()));
 		}
     }
     
     private void compareUser(user oldVal, user newVal, String queueName, long recordTime) {
-        if (!(oldVal.getUsername() == newVal.getUsername())) {
-        	//write to SQL
-        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_username", recordTime, newVal.getUsername().toString());
+        if (oldVal == null && newVal != null) {
+        	System.out.println("new user comes!");
+        	System.out.println(newVal.getUsername() + "\n" + newVal.getNumActiveApplications() + "\n" + newVal.getNumActiveApplications());
+//        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_username", recordTime, newVal.getUsername().toString());
+//        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_NumActiveApplications", recordTime, Integer.toString(newVal.getNumActiveApplications()));
+//        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_NumActiveApplications", recordTime, Integer.toString(newVal.getNumActiveApplications()));
         }
-        if (!(oldVal.getNumActiveApplications() == newVal.getNumActiveApplications())) {
-        	//write to SQL
-        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_NumActiveApplications", recordTime, Integer.toString(newVal.getNumActiveApplications()));
+        else if (oldVal == null && newVal == null) {
+        	return;
         }
-        if (!(oldVal.getNumPendingApplications() == newVal.getNumActiveApplications())) {
-        	//write to SQL
-        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_NumActiveApplications", recordTime, Integer.toString(newVal.getNumActiveApplications()));
+        else if (oldVal != null && newVal == null) {
+        	
         }
-        compareResourcesUsed(oldVal.getResourcesUsed(), newVal.getResourcesUsed(), queueName, recordTime);
+        else {
+	    	if (oldVal.getUsername() != newVal.getUsername()) {
+//	        	System.out.println("users_username need to update!");
+	        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_username", recordTime, newVal.getUsername().toString());
+	        }
+	        if (oldVal.getNumActiveApplications() != newVal.getNumActiveApplications()) {	
+//	        	System.out.println("users_numActiveApplications need to update!");
+	        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_NumActiveApplications", recordTime, Integer.toString(newVal.getNumActiveApplications()));
+	        }
+	        if (oldVal.getNumPendingApplications() != newVal.getNumActiveApplications()) {
+//	        	System.out.println("users_numPendingApplications need to update!");
+	        	schedulerMetricsWriter.writeSchedulerTable(queueName, "user_NumActiveApplications", recordTime, Integer.toString(newVal.getNumActiveApplications()));
+	        }
+	        compareResourcesUsed(oldVal.getResourcesUsed(), newVal.getResourcesUsed(), queueName, recordTime);
+        }
     }
+    
 
     private int getTotalContainers(Scheduler.queue[] list) {
         int totalContainers = 0;
