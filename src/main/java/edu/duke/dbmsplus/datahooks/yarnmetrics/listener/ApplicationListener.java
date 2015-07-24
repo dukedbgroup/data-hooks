@@ -91,7 +91,7 @@ public abstract class ApplicationListener {
         private volatile boolean running = true;
         private static final int WAIT_TIME = 50;
         private SQLWrapper appMetricsWriter;
-        private Apps.app[] state;
+        private Apps.app[] state = new Apps.app[10];
 
         public AppThread() {
             appMetricsWriter = new SQLWrapper();
@@ -101,33 +101,20 @@ public abstract class ApplicationListener {
             running = false;
         }
 
-        private void initState() {
-            String appsResponse;
-            try {
-                appsResponse = sendAppsGet(startTime);
-                System.out.println("================Apps Json init================");
-                System.out.println(appsResponse);
-                System.out.println("================ Apps Json end ================");
-                state = readAppsJsonResponse(appsResponse);
-            } catch (Exception e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-        }
-
         public void run() {
-            initState();
+            appMetricsWriter.createAppsTable();
 
             while (running) {
                 try {
                     String appsResponse = sendAppsGet(startTime);
                     long recordTime = System.currentTimeMillis();
-                    System.out.println("================Apps Json start================");
-                    System.out.println(appsResponse);
-                    System.out.println("================ Apps Json end ================");
+//                    System.out.println("================Apps Json start================");
+//                    System.out.println(appsResponse);
+//                    System.out.println("================ Apps Json end ================");
                     Apps.app[] apps = readAppsJsonResponse(appsResponse);
 
                     for (int i = 0; i < apps.length; i++) {
+                        
                         Apps.app app = apps[i];
                         // new app comes
                         if (!appsSet.contains(app) && !removedApps.contains(app)) {
@@ -136,6 +123,7 @@ public abstract class ApplicationListener {
                             appToContainersMap.put(app, app.getRunningContainers());
                             onAppBegin(app);
                             writeMetricsToAppTable(app, recordTime);
+                            state[i] = app;
 
                         }
                         // app finished.
