@@ -91,7 +91,7 @@ public abstract class ApplicationListener {
         private volatile boolean running = true;
         private static final int WAIT_TIME = 50;
         private SQLWrapper appMetricsWriter;
-        private Apps.app[] state = new Apps.app[10];
+        private HashMap<String, Apps.app> state = new HashMap<String, Apps.app>();
 
         public AppThread() {
             appMetricsWriter = new SQLWrapper();
@@ -106,6 +106,7 @@ public abstract class ApplicationListener {
 
             while (running) {
                 try {
+                    Thread.sleep(WAIT_TIME);
                     String appsResponse = sendAppsGet(startTime);
                     long recordTime = System.currentTimeMillis();
 //                    System.out.println("================Apps Json start================");
@@ -116,14 +117,20 @@ public abstract class ApplicationListener {
                     for (int i = 0; i < apps.length; i++) {
                         
                         Apps.app app = apps[i];
-                        // new app comes
+                        
+                        if (state.containsKey(app.getId())) {
+                            updateAppsTable(state.get(app.getId()), app, recordTime);
+                            state.put(app.getId(), app);
+                        }
+                     // new app comes
                         if (!appsSet.contains(app) && !removedApps.contains(app)) {
+                            System.out.println("************new app comes!*********");
                             appsSet.add(app);
                             appToStateMap.put(app, app.getState());
                             appToContainersMap.put(app, app.getRunningContainers());
                             onAppBegin(app);
                             writeMetricsToAppTable(app, recordTime);
-                            state[i] = app;
+                            state.put(app.getId(), app);
 
                         }
                         // app finished.
@@ -133,22 +140,22 @@ public abstract class ApplicationListener {
                             appToStateMap.put(app, app.getState());
                             onAppFinish(app);
                             writeMetricsToAppTable(app, recordTime);
+                            state.remove(app.getId());
                         }
+                        // app state changes.
                         if (!app.getState().equals(appToStateMap.get(app))) {
                             appToStateMap.put(app, app.getState());
                             onAppChangeState(app);
                         }
+                        // app container number changes.
                         if (app.getRunningContainers() != appToContainersMap.get(app)) {
                             appToContainersMap.put(app, app.getRunningContainers());
                             onAppChangeContainers(app);
                         }
-                        if (appsSet.contains(app)) {
-                            updateAppsTable(state[i], app, recordTime);
-                        }
+                        
                     }
-                    state = apps;
-                    Thread.sleep(WAIT_TIME);
                 } catch (Exception e) {
+//                    e.printStackTrace();
                     // do nothing if appsResponse is empty
                 }
             }
@@ -160,39 +167,57 @@ public abstract class ApplicationListener {
             Class cls = oldApp.getClass();
             Field[] fields = cls.getDeclaredFields();
 
-            for (int i = 0; i < fields.length - 1; i++) {
+            for (int i = 0; i < fields.length; i++) {
                 // System.out.println(f.toString());
                 fields[i].setAccessible(true);
                 Object oldVal = fields[i].get(oldApp);
                 // System.out.println(oldVal.toString());
                 Object newVal = fields[i].get(oldApp);
                 // System.out.println(oldVal +"===" + newVal);
-                if (!oldVal.toString().equals(newVal.toString())) {
+//                System.out.println("Update: The field:" + fields[i].getName() +
+//                        "\nold value: " + oldVal +" \nnew value: " + newVal + "\nTime:" +
+//                        recordTime);
+                if (oldVal == null || newVal == null) {
+                    if (newVal != null) {
+                        System.out.println("***********updateAppsTable**********");
+                        appMetricsWriter.writeAppsTable(newApp.getId(), fields[i].getName(),
+                                recordTime, newVal.toString());
+                    }
+                }
+                else if (!oldVal.toString().equals(newVal.toString())) {
                     // TODO: update to MySQL
+                    System.out.println("***********updateAppsTable**********");
                     appMetricsWriter.writeAppsTable(oldApp.getId(), fields[i].getName(),
                             recordTime, newVal.toString());
-                    // System.out.println("Update: The field:" + fields[i].getName() +
-                    // "\nold value: " + oldVal +" \nnew value: " + newVal + "\nTime:" +
-                    // recordTime);
+
                 }
             }
         }
 
-        private void writeMetricsToAppTable(app app, long recordTime)
-                throws IllegalArgumentException, IllegalAccessException {
+        private void writeMetricsToAppTable(app app, long recordTime){
             Class cls = app.getClass();
             Field[] fields = cls.getDeclaredFields();
-            for (int i = 0; i < fields.length - 1; i++) {
-                // System.out.println(f.toString());
-                fields[i].setAccessible(true);
-                Object val = fields[i].get(app);
-                // System.out.println(oldVal +"===" + newVal);
-                appMetricsWriter.writeAppsTable(app.getId(), fields[i].getName(), recordTime,
-                        val.toString());
-                // System.out.println("New App comes or App finished.\n" + "Update: The field:" +
-                // fields[i].getName() + "\nold value: " + oldVal +" \nnew value: " + newVal +
-                // "\nTime:" + recordTime);
+            System.out.println("Length of fields of new app: " + fields.length);
+            try {
+                for (Field f: fields) {
+                    f.setAccessible(true);
+                    Object val = f.get(app);
+                    System.out.println("the metrics name:" + f.getName() + "\nval: " + val);
+                    if (val == null) {
+                        appMetricsWriter.writeAppsTable(app.getId(), f.getName(), recordTime, String.valueOf(val));
+                        System.out.println("not available: The field:" + f.getName() + "\nvalue:" + val + " not available" + "\nTime:" + recordTime);
+    
+                    }
+                    else {
+                        appMetricsWriter.writeAppsTable(app.getId(), f.getName(), recordTime, val.toString());
+                        System.out.println("new field:" + f.getName() + "\nvalue: " + val + "\nTime:" + recordTime);
+                    }
+                }
+            } catch (IllegalArgumentException | IllegalAccessException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
             }
         }
     }
 }
+
