@@ -37,11 +37,7 @@ public class ApplicationListener {
     public void stop() {
         if (thread != null) {
             runnable.terminate();
-            try {
-                thread.join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            thread.interrupt();
         }
     }
 }
@@ -89,7 +85,7 @@ public class ApplicationListener {
             appMetricsWriter.createAppsTable();
             initState(hgh);
             System.out.println("monitor applications daemon is running");
-            
+           
             while (running) {
                 try {
                     Thread.sleep(WAIT_TIME);
@@ -114,6 +110,8 @@ public class ApplicationListener {
                     state = apps;
                 } catch (Exception e) {
                     e.printStackTrace();
+                    System.out.println("Application Listenner stopped.");
+                    return;
                     // do nothing if appsResponse is empty
                 }
             }

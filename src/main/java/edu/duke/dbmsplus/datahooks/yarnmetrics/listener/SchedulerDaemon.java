@@ -41,14 +41,10 @@ public class SchedulerDaemon {
     }
 
 	public void stop() {
-		if (thread != null) {
-			runnable.terminate();
-			try {
-	             thread.join();
-			} catch (InterruptedException e) {
-	             e.printStackTrace();
-			}
-		} 
+	    if (thread != null) {
+            runnable.terminate();
+            thread.interrupt();
+        }
 	}
 }
 
@@ -56,12 +52,12 @@ class SchedulerThread implements Runnable {
 
     private volatile boolean running = true;
     private static int WAIT_TIME = 250;
-    private StatsDLogger logger;
+//    private StatsDLogger logger;
     private Scheduler.queue[] lastState;
     private SQLWrapper schedulerMetricsWriter;
 
     public SchedulerThread() {
-        logger = new StatsDLogger();
+//        logger = new StatsDLogger();
         schedulerMetricsWriter = new SQLWrapper();
     }
 
@@ -99,10 +95,10 @@ class SchedulerThread implements Runnable {
   
                 lastState = list;
                 
-                logger.logGauge("totalContainers", getTotalContainers(list));
-                logger.logGauge("totalActiveApplications", getTotalActiveApplications(list));
-                logger.logGauge("totalApplications", getTotalApplications(list));
-                logger.logGauge("maxApplications", getMaxApplications(list));
+//                logger.logGauge("totalContainers", getTotalContainers(list));
+//                logger.logGauge("totalActiveApplications", getTotalActiveApplications(list));
+//                logger.logGauge("totalApplications", getTotalApplications(list));
+//                logger.logGauge("maxApplications", getMaxApplications(list));
                 /// SHOULD POST MESSAGES TO KAFKA
                
 

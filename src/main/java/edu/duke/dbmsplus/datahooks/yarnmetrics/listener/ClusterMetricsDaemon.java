@@ -46,12 +46,8 @@ public class ClusterMetricsDaemon {
 	public void stop() {
 		if (thread != null) {
             runnable.terminate();
-            try {
-                thread.join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
+            thread.interrupt();
+		}
 	}
 }
 
@@ -62,12 +58,12 @@ class ClusterMetricsThread implements Runnable {
      * record the state of last time
      */
     private ClusterMetrics current;
-    private static int WAIT_TIME = 50;
-    private StatsDLogger logger;
+    private static int WAIT_TIME = 250;
+//    private StatsDLogger logger;
     private SQLWrapper clusterMetricsWriter;
 
     public ClusterMetricsThread() {
-        logger = new StatsDLogger();
+//        logger = new StatsDLogger();
         clusterMetricsWriter = new SQLWrapper();
     }
     
@@ -103,15 +99,15 @@ class ClusterMetricsThread implements Runnable {
                 current = metrics;
                 //System.out.println(clusterMetricsResponse);
                 
-                logger.logGauge("allocatedMB", (int) metrics.getClusterMetrics().getAllocatedMB());
-                logger.logGauge("appsCompleted", metrics.getClusterMetrics().getAppsCompleted());
-                logger.logGauge("appsSubmitted", metrics.getClusterMetrics().getAppsSubmitted());
-                logger.logGauge("appsRunning", metrics.getClusterMetrics().getAppsRunning());
-                logger.logGauge("availableMB", (int) metrics.getClusterMetrics().getAvailableMB());
-                logger.logGauge("activeNodes", metrics.getClusterMetrics().getActiveNodes());
-                logger.logGauge("totalNodes", metrics.getClusterMetrics().getTotalNodes());
-                logger.logGauge("appsFailed", metrics.getClusterMetrics().getAppsFailed());
-                logger.logGauge("containersAllocated", metrics.getClusterMetrics().getContainersAllocated());
+//                logger.logGauge("allocatedMB", (int) metrics.getClusterMetrics().getAllocatedMB());
+//                logger.logGauge("appsCompleted", metrics.getClusterMetrics().getAppsCompleted());
+//                logger.logGauge("appsSubmitted", metrics.getClusterMetrics().getAppsSubmitted());
+//                logger.logGauge("appsRunning", metrics.getClusterMetrics().getAppsRunning());
+//                logger.logGauge("availableMB", (int) metrics.getClusterMetrics().getAvailableMB());
+//                logger.logGauge("activeNodes", metrics.getClusterMetrics().getActiveNodes());
+//                logger.logGauge("totalNodes", metrics.getClusterMetrics().getTotalNodes());
+//                logger.logGauge("appsFailed", metrics.getClusterMetrics().getAppsFailed());
+//                logger.logGauge("containersAllocated", metrics.getClusterMetrics().getContainersAllocated());
                 /// SHOULD POST MESSAGES TO KAFKA
 
             } catch (Exception e) {
