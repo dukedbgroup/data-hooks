@@ -3,13 +3,17 @@
  */
 package edu.duke.dbmsplus.datahooks.yarnmetrics.pojo;
 
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+
 /**
  * POJO for Application object: /ws/v1/cluster/apps
  * 
  * @author rahulswaminathan, Xiaodan
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Apps {
-    private apps apps;
+    
+    private apps apps = null;
 
     public Apps() {}
 
@@ -60,16 +64,16 @@ public class Apps {
 
         }
 
-        public int hashCode() {
-            return this.id.hashCode();
-        }
-
-        public boolean equals(Object other) {
-            if (!(other instanceof Apps.app))
-                return false;
-            Apps.app otherApp = (Apps.app) other;
-            return this.hashCode() == otherApp.hashCode();
-        }
+//        public int hashCode() {
+//            return this.id.hashCode();
+//        }
+//
+//        public boolean equals(Object other) {
+//            if (!(other instanceof Apps.app))
+//                return false;
+//            Apps.app otherApp = (Apps.app) other;
+//            return this.hashCode() == otherApp.hashCode();
+//        }
 
         public long getFinishedTime() {
             return finishedTime;

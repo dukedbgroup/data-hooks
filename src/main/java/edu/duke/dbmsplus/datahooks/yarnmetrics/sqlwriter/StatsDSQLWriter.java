@@ -116,6 +116,7 @@ public class StatsDSQLWriter {
     	private volatile boolean running = true;
 
         public void run() {
+            System.out.println("SQLWriter is running.");
             while (running) {
                 server.waitForMessage();
 
@@ -134,6 +135,7 @@ public class StatsDSQLWriter {
                     e.printStackTrace();
                 }
             }
+            System.out.println("SQLWriter is stopped.");
         }
         public void terminate() {
 			// TODO Auto-generated method stub

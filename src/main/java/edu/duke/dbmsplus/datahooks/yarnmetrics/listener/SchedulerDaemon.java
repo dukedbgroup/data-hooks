@@ -43,13 +43,12 @@ public class SchedulerDaemon {
 	public void stop() {
 		if (thread != null) {
 			runnable.terminate();
-		}
-	    try {
-	         thread.join();
-	         } 
-	    catch (InterruptedException e) {
-	         e.printStackTrace();
-	         }
+			try {
+	             thread.join();
+			} catch (InterruptedException e) {
+	             e.printStackTrace();
+			}
+		} 
 	}
 }
 
@@ -93,9 +92,9 @@ class SchedulerThread implements Runnable {
             try {
             	Thread.sleep(WAIT_TIME);
             	long recordTime = System.currentTimeMillis();
-                String schedulerResponse = hgh.sendGet();
+                String schedulerResponse2 = hgh.sendGet();
 //                System.out.println(schedulerResponse);
-                Scheduler.queue[] list = readClusterSchedulerJsonResponse(schedulerResponse);
+                Scheduler.queue[] list = readClusterSchedulerJsonResponse(schedulerResponse2);
                 updateSchedulerTable(lastState, list, recordTime);
   
                 lastState = list;

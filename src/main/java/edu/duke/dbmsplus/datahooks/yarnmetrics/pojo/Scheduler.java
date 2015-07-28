@@ -2,9 +2,6 @@ package edu.duke.dbmsplus.datahooks.yarnmetrics.pojo;
 
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * POJO for Scheduler info, queue, user, resource Object: /ws/v1/cluster/scheduler
  * @author rahulswaminathan, Xiaodan

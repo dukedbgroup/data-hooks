@@ -10,14 +10,14 @@ public class LaunchDaemons {
 	
 	private ClusterMetricsDaemon cmDaemon;
 	private SchedulerDaemon schDaemon;
-	private MonitorApplicationsDaemon appDaemon;
+	private ApplicationListener appDaemon;
 	private StatsDSQLWriter sqlWriter; 
 
 	public LaunchDaemons() {
 		
 		cmDaemon = new ClusterMetricsDaemon();
         schDaemon = new SchedulerDaemon();
-        appDaemon = new MonitorApplicationsDaemon();
+        appDaemon = new ApplicationListener();
         sqlWriter = new StatsDSQLWriter();
 	}
 	
@@ -36,5 +36,6 @@ public class LaunchDaemons {
         schDaemon.stop();
         appDaemon.stop();
         sqlWriter.stop();
+        return;
     }
 }
