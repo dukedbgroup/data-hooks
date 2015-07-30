@@ -277,11 +277,69 @@ public class SQLWrapper {
      * @param value Value of the metrics
      * @return true on success, false otherwise
      */
-    public boolean writeAppsTable(String AppsId, String metricsName, long time, String value) {
+    public boolean writeAppsTable(String appsId, String metricsName, long time, String value) {
         Statement statement;
         try {
             statement = conn.createStatement();
-            statement.executeUpdate("INSERT INTO applications_metrics VALUES" + "('" + AppsId
+            statement.executeUpdate("INSERT INTO applications_metrics VALUES" + "('" + appsId
+                    + "','" + metricsName + "', '" + BigInteger.valueOf(time) + "', '" + value
+                    + "')");
+        } catch (SQLException e) {
+            printSQLInformation(e);
+            return false;
+        }
+        return true;
+    }
+    
+    public boolean createNodesAppsTable() {
+        Statement statement;
+        try {
+            statement = conn.createStatement();
+            statement
+                    .executeUpdate("CREATE TABLE IF NOT EXISTS "
+                            + "nodes_apps_metrics"
+                            + "(nodeAddress varchar(255), appId varchar(255), MetricsName varchar(255), RecordTime bigint(20), Value varchar(255))");
+        } catch (SQLException e) {
+            printSQLInformation(e);
+            return false;
+        }
+        return true;
+    }
+    
+    public boolean writeNodesAppsTable(String nodeAddress, String appId, String metricsName, long time, String value) {
+        Statement statement;
+        try {
+            statement = conn.createStatement();
+            statement.executeUpdate("INSERT INTO nodes_apps_metrics VALUES" + "('" + nodeAddress + "','" + appId
+                    + "','" + metricsName + "', '" + BigInteger.valueOf(time) + "', '" + value
+                    + "')");
+        } catch (SQLException e) {
+            printSQLInformation(e);
+            return false;
+        }
+        return true;
+    }
+    
+    public boolean createNodesContainersTable() {
+        Statement statement;
+        try {
+            statement = conn.createStatement();
+            statement
+                    .executeUpdate("CREATE TABLE IF NOT EXISTS "
+                            + "nodes_containers_metrics"
+                            + "(nodeAddress varchar(255), containerId varchar(255), MetricsName varchar(255), RecordTime bigint(20), Value varchar(255))");
+        } catch (SQLException e) {
+            printSQLInformation(e);
+            return false;
+        }
+        return true;
+    }
+    
+    public boolean writeNodesContainersTable(String nodeAddress, String containerId, String metricsName, long time, String value) {
+        Statement statement;
+        try {
+            statement = conn.createStatement();
+            statement.executeUpdate("INSERT INTO nodes_apps_metrics VALUES" + "('" + nodeAddress + "','" + containerId
                     + "','" + metricsName + "', '" + BigInteger.valueOf(time) + "', '" + value
                     + "')");
         } catch (SQLException e) {

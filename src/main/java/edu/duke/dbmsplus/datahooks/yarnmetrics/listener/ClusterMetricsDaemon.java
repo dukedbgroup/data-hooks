@@ -109,6 +109,8 @@ class ClusterMetricsThread implements Runnable {
 //                logger.logGauge("containersAllocated", metrics.getClusterMetrics().getContainersAllocated());
                 /// SHOULD POST MESSAGES TO KAFKA
 
+            } catch (InterruptedException e) {
+                return;
             } catch (Exception e) {
                 e.printStackTrace();
             }
