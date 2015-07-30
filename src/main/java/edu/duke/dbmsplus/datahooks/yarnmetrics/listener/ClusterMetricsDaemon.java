@@ -3,7 +3,6 @@ package edu.duke.dbmsplus.datahooks.yarnmetrics.listener;
 import com.timgroup.statsd.NonBlockingStatsDClient;
 import com.timgroup.statsd.StatsDClient;
 
-import edu.duke.dbmsplus.datahooks.yarnmetrics.listener.ApplicationListener.AppThread;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.ClusterMetrics;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.sqlwriter.SQLWrapper;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.statsd.StatsDLogger;

@@ -11,6 +11,7 @@ public class LaunchDaemons {
 	private ClusterMetricsDaemon cmDaemon;
 	private SchedulerDaemon schDaemon;
 	private ApplicationListener appDaemon;
+	private NodesListener nodesDaemon;
 //	private StatsDSQLWriter sqlWriter; 
 
 	public LaunchDaemons() {
@@ -18,7 +19,8 @@ public class LaunchDaemons {
 		cmDaemon = new ClusterMetricsDaemon();
         schDaemon = new SchedulerDaemon();
         appDaemon = new ApplicationListener();
-        sqlWriter = new StatsDSQLWriter();
+        nodesDaemon = new NodesListener();
+//        sqlWriter = new StatsDSQLWriter();
 	}
 	
     public void startDaemons() {
@@ -26,6 +28,7 @@ public class LaunchDaemons {
         cmDaemon.run();
         schDaemon.run();
         appDaemon.run();
+        nodesDaemon.run();
 //        sqlWriter.run();
 
     }
@@ -35,6 +38,7 @@ public class LaunchDaemons {
     	cmDaemon.stop();
         schDaemon.stop();
         appDaemon.stop();
+        nodesDaemon.stop();
 //        sqlWriter.stop();
         return;
     }

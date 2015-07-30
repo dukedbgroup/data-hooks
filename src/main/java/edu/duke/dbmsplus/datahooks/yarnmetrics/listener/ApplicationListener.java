@@ -98,7 +98,7 @@ public class ApplicationListener {
 //                    System.out.println(appsResponse);
                     
                     for (int i = 0; i < apps.length; i++) {
-                        System.out.println("apps update begin...........");
+//                        System.out.println("apps update begin...........");
                         if (state[i].getState() != null && state[i].getState().equals(apps[i].getState()) 
                                 && apps[i].getState().equals("FINISHED")) {
                             writeToAppsTable(apps[i], recordTime);
@@ -110,7 +110,7 @@ public class ApplicationListener {
                     state = apps;
                 } catch (Exception e) {
                     e.printStackTrace();
-                    System.out.println("Application Listenner stopped.");
+                    System.out.println("Application Listenner stopped with exception.");
                     return;
                     // do nothing if appsResponse is empty
                 }
@@ -149,21 +149,21 @@ public class ApplicationListener {
 //                            recordTime);
                     if (oldVal == null || newVal == null) {
                         if (newVal != null) {
-                            System.out.println("***********updateAppsTable**********");
+//                            System.out.println("***********updateAppsTable**********");
                             appMetricsWriter.writeAppsTable(newApp.getId(), fields[i].getName(),
                                     recordTime, newVal.toString());
                             isRecordTime = true;
                         }
                     }
                     else if (!oldVal.toString().equals(newVal.toString())) {
-                        System.out.println("***********updateAppsTable**********");
+//                        System.out.println("***********updateAppsTable**********");
                         appMetricsWriter.writeAppsTable(newApp.getId(), fields[i].getName(),
                                 recordTime, newVal.toString());
                         isRecordTime = true;
                     }
                 }
                 if (isRecordTime == true) {
-                    System.out.println("***********update elapsedTime**********");
+//                    System.out.println("***********update elapsedTime**********");
                     appMetricsWriter.writeAppsTable(newApp.getId(), "elapsedTime",
                                     recordTime, String.valueOf(newApp.getElapsedTime()));
                 }
