@@ -339,7 +339,7 @@ public class SQLWrapper {
         Statement statement;
         try {
             statement = conn.createStatement();
-            statement.executeUpdate("INSERT INTO nodes_apps_metrics VALUES" + "('" + nodeAddress + "','" + containerId
+            statement.executeUpdate("INSERT INTO nodes_containers_metrics VALUES" + "('" + nodeAddress + "','" + containerId
                     + "','" + metricsName + "', '" + BigInteger.valueOf(time) + "', '" + value
                     + "')");
         } catch (SQLException e) {
