@@ -44,6 +44,12 @@ public class SchedulerDaemon {
 	    if (thread != null) {
             runnable.terminate();
             thread.interrupt();
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
         }
 	}
 }
@@ -102,6 +108,9 @@ class SchedulerThread implements Runnable {
                 /// SHOULD POST MESSAGES TO KAFKA
                
 
+            } catch (InterruptedException e) {
+                System.out.println("Scheduler Listener, Sleep is over.");
+                return;
             } catch (Exception e) {
                 e.printStackTrace();
             }

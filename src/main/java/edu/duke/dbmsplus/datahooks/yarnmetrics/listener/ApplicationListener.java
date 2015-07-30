@@ -38,6 +38,12 @@ public class ApplicationListener {
         if (thread != null) {
             runnable.terminate();
             thread.interrupt();
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
         }
     }
 }
@@ -108,6 +114,9 @@ public class ApplicationListener {
                         }
                     }
                     state = apps;
+                } catch (InterruptedException e) {
+                    System.out.println("Application Listenner, Sleep is over.");
+                    return;
                 } catch (Exception e) {
                     e.printStackTrace();
                     System.out.println("Application Listenner stopped with exception.");

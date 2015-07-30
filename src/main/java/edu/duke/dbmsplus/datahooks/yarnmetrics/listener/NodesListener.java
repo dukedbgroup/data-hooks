@@ -3,6 +3,7 @@ package edu.duke.dbmsplus.datahooks.yarnmetrics.listener;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -14,7 +15,6 @@ import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 
-import scala.actors.threadpool.Arrays;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.Containers;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.Containers.container;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.NodeApps;
@@ -49,6 +49,12 @@ public class NodesListener {
         if (thread != null) {
             runnable.terminate();
             thread.interrupt();
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
         }
     }
 }
@@ -291,6 +297,7 @@ public class NodesListener {
             Class cls = oldContainer.getClass();
             Field[] fields = cls.getDeclaredFields();
             for (Field f: fields) {
+                f.setAccessible(true);
                 if (f.getName().equals("exitCode") || f.getName().equals("containerLogsLink")) {
                     continue;
                 }

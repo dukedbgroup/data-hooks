@@ -46,6 +46,12 @@ public class ClusterMetricsDaemon {
 		if (thread != null) {
             runnable.terminate();
             thread.interrupt();
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
 		}
 	}
 }
