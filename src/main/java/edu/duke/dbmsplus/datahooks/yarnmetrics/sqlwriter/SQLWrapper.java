@@ -327,7 +327,7 @@ public class SQLWrapper {
             statement
                     .executeUpdate("CREATE TABLE IF NOT EXISTS "
                             + "nodes_containers_metrics"
-                            + "(nodeAddress varchar(255), containerId varchar(255), MetricsName varchar(255), RecordTime bigint(20), Value varchar(255))");
+                            + "(nodeAddress varchar(255), containerId varchar(255), MetricsName varchar(255), RecordTime bigint(20), Value text)");
         } catch (SQLException e) {
             printSQLInformation(e);
             return false;
@@ -339,6 +339,9 @@ public class SQLWrapper {
         Statement statement;
         try {
             statement = conn.createStatement();
+            if(value.length() >= 255) {
+                value = value.substring(0, 255);
+            }
             statement.executeUpdate("INSERT INTO nodes_containers_metrics VALUES" + "('" + nodeAddress + "','" + containerId
                     + "','" + metricsName + "', '" + BigInteger.valueOf(time) + "', '" + value
                     + "')");

@@ -1,6 +1,5 @@
 package edu.duke.dbmsplus.datahooks.yarnmetrics.listener;
 
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -8,10 +7,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 
 import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.JsonProcessingException;
 import org.codehaus.jackson.map.DeserializationConfig;
-import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 
@@ -52,7 +48,6 @@ public class NodesListener {
             try {
                 thread.join();
             } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }
@@ -90,7 +85,7 @@ public class NodesListener {
                     "http://" + pp.getYarnWEBUI() + "/ws/v1/cluster/nodes";
             HttpGetHandler hgh = new HttpGetHandler(url);
             String nodesrep = hgh.sendGet();
-            System.out.println(nodesrep);
+//            System.out.println(nodesrep);
             
             try {
                 ObjectMapper mapper = new ObjectMapper();
@@ -106,7 +101,6 @@ public class NodesListener {
                     address.add(anode.getNodeHTTPAddress());
                 }
             } catch (Exception e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             } 
             return address;
@@ -135,7 +129,6 @@ public class NodesListener {
                     }
                 }
             } catch (Exception e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
             return result;
@@ -157,7 +150,6 @@ public class NodesListener {
                     result.put(container.getId(), container);
                 }
             } catch (Exception e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
             return result;
@@ -187,7 +179,7 @@ public class NodesListener {
                             "http://" + address + "/ws/v1/node/apps";
                     HttpGetHandler hgh = new HttpGetHandler(url);
                     String appsResponse = hgh.sendGet();
-                    System.out.println(appsResponse);
+//                    System.out.println(appsResponse);
                     if (!getApps(appsResponse).isEmpty()) {
                     nodesAppsListTemp.put(address, getApps(appsResponse));
                     }
@@ -199,7 +191,7 @@ public class NodesListener {
                             "http://" + address + "/ws/v1/node/containers";
                     HttpGetHandler hgh = new HttpGetHandler(url);
                     String containersResponse = hgh.sendGet();
-                    System.out.println(containersResponse);
+//                    System.out.println(containersResponse);
                     if (!getContainers(containersResponse).isEmpty()) {
                     nodesContainersListTemp.put(address, getContainers(containersResponse));
                     }         
@@ -238,10 +230,13 @@ public class NodesListener {
                                 if (newApp.getState().equals("FINISHED")) {
                                     writeAppMetrics(add, newApp, newApp.getId(), recordTime);
                                     finishedApps.add(newApp.getId());
+                                    System.out.println(finishedApps);
                                 }
+                                else {
                                 //compare running app here
-                                compareNodesApp(oldApp, newApp, add, recordTime);
-                                System.out.println("*******compare exsiting apps*********");
+                                    compareNodesApp(oldApp, newApp, add, recordTime);
+//                                    System.out.println("*******compare exsiting apps*********");
+                                }
                             }
                         }
                     }
@@ -263,14 +258,12 @@ public class NodesListener {
                         for(String name: newMap.keySet()){
                             if(!oldMap.containsKey(name)) {
                                 //output, find a new container
-                                System.out.println("get a new container! Output all containers.");
-                                for (Containers.container container: nodesContainersListTemp.get(add).values()) {
-                                    writeContainerMetrics(add, container, container.getId(), recordTime);
-                                }
+                                System.out.println("get a new container! Output the container.");
+                                    writeContainerMetrics(add, newMap.get(name), name, recordTime);
                             }
                             else {
                                 //compare exsisting container
-                                System.out.println("*******compare containers*********");
+//                                System.out.println("*******compare containers*********");
                                 Containers.container oldContainer = oldMap.get(name);
                                 Containers.container newContainer = newMap.get(name);
                                 compareNodesContainer(oldContainer, newContainer, add, recordTime);
@@ -293,7 +286,6 @@ public class NodesListener {
 
         private void compareNodesContainer(container oldContainer, container newContainer,
                 String nodeAddress, long recordTime) {
-            // TODO Auto-generated method stub
             Class cls = oldContainer.getClass();
             Field[] fields = cls.getDeclaredFields();
             for (Field f: fields) {
@@ -308,7 +300,6 @@ public class NodesListener {
                         NodesMetricsWriter.writeNodesContainersTable(nodeAddress, newContainer.getId(), f.getName(), recordTime, newVal.toString());
                     }
                 } catch (IllegalArgumentException | IllegalAccessException e) {
-                    // TODO Auto-generated catch block
                     e.printStackTrace(); 
                 }
             }
@@ -329,14 +320,17 @@ public class NodesListener {
         private void compareNodesApp(app oldApp, app newApp, String nodeAddress, long recordTime) {
             
             String[] oldCon = oldApp.getContainerids();
-            String[] newCon = oldApp.getContainerids();
+            String[] newCon = newApp.getContainerids();
             //do not have any containers
             if (oldCon == null && newCon == null) {
+                System.out.println("nothing here!");
                 return;
             }
             //assigned new containers
             else if (oldCon == null || oldCon.length == 0) {
                 for (String containerId: newCon) {
+                    System.out.println("new containers here!");
+                   
                     NodesMetricsWriter.writeNodesAppsTable(nodeAddress, newApp.getId(), "containerId", recordTime, containerId);
                 }
             }
@@ -344,20 +338,30 @@ public class NodesListener {
                 //num of containers changed
                 if (oldCon.length != newCon.length) {
                     for (String containerId: newCon) {
+                        System.out.println("new containers here!");
+                        System.out.println(containerId);
                         NodesMetricsWriter.writeNodesAppsTable(nodeAddress, newApp.getId(), "containerId", recordTime, containerId);
                     } 
                 }
                 else {
                     //some containers changed
-                    HashSet<String> temp = new HashSet<String>(Arrays.asList(oldCon));
-                    for (String containerId: newCon) {
-                        if (!temp.contains(containerId)) {
-                            NodesMetricsWriter.writeNodesAppsTable(nodeAddress, newApp.getId(), "containerId", recordTime, containerId);
+                    int i = 0;
+                    for (String newContainerId: newCon) {
+                        for (i = 0; i < oldCon.length; i++) {
+                            if (newContainerId.equals(oldCon[i])) {
+                                break;
+                            }
+                        }
+                        if (i == oldCon.length) {
+                            System.out.println("containers changed here!");
+//                            NodesMetricsWriter.writeNodesAppsTable(nodeAddress, newApp.getId(), "containerId", recordTime, newContainerId); 
                         }
                     }
-                } 
+                }
             }
         }
+            
+        
 
         private void writeAppMetrics(String nodeAddress, NodeApps.app app, String appId, long recordTime) {
             NodesMetricsWriter.writeNodesAppsTable(nodeAddress, appId, "state", recordTime, app.getState().toString());

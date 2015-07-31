@@ -184,20 +184,20 @@ public class ApplicationListener {
         private void writeToAppsTable(app app, long recordTime){
             Class cls = app.getClass();
             Field[] fields = cls.getDeclaredFields();
-            System.out.println("Length of fields of new app: " + fields.length);
+//            System.out.println("Length of fields of new app: " + fields.length);
             try {
                 for (Field f: fields) {
                     f.setAccessible(true);
                     Object val = f.get(app);
-                    System.out.println("the metrics name:" + f.getName() + "\nval: " + val);
+//                    System.out.println("the metrics name:" + f.getName() + "\nval: " + val);
                     if (val == null) {
                         appMetricsWriter.writeAppsTable(app.getId(), f.getName(), recordTime, String.valueOf(val));
-                        System.out.println("not available: The field:" + f.getName() + "\nvalue:" + val + " not available" + "\nTime:" + recordTime);
+//                        System.out.println("not available: The field:" + f.getName() + "\nvalue:" + val + " not available" + "\nTime:" + recordTime);
     
                     }
                     else {
                         appMetricsWriter.writeAppsTable(app.getId(), f.getName(), recordTime, val.toString());
-                        System.out.println("new field:" + f.getName() + "\nvalue: " + val + "\nTime:" + recordTime);
+//                        System.out.println("new field:" + f.getName() + "\nvalue: " + val + "\nTime:" + recordTime);
                     }
                 }
             } catch (Exception e) {
