@@ -6,11 +6,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.DeserializationConfig;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 
+import bigframe.qgen.QGenDriver;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.Containers;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.Containers.container;
 import edu.duke.dbmsplus.datahooks.yarnmetrics.pojo.NodeApps;
@@ -55,6 +58,7 @@ public class NodesListener {
 }
 
     class NodesThread implements Runnable {
+        private static final Log LOG = LogFactory.getLog(NodesListener.class);
         
         private volatile boolean running = true;
         private static int WAIT_TIME = 500;
@@ -159,7 +163,7 @@ public class NodesListener {
 
             NodesMetricsWriter.createNodesAppsTable();
             NodesMetricsWriter.createNodesContainersTable();
-            System.out.println("Nodes listener is running!");
+            LOG.info("Nodes listener is running!");
             while(running) {
                 long recordTime = System.currentTimeMillis();
                 //find all the nodes addresses
@@ -201,8 +205,8 @@ public class NodesListener {
                     //detected a new node running apps
                     if(!nodesAppsList.containsKey(add)) {
                         //find a new node, output
-                        System.out.println("get a new node running apps!");
-                        System.out.println("its address is: " + add);
+//                        System.out.println("get a new node running apps!");
+//                        System.out.println("its address is: " + add);
                         HashMap<String, NodeApps.app> map = nodesAppsListTemp.get(add);
                         for (NodeApps.app app: map.values()) {
                             writeAppMetrics(add, app, app.getId(),recordTime);
@@ -217,7 +221,7 @@ public class NodesListener {
                             // this is a new app
                             if(!oldMap.containsKey(name)) {
                                 //output, find a new app
-                                System.out.println("get a new app!");
+//                                System.out.println("get a new app!");
                                 writeAppMetrics(add, newMap.get(name), newMap.get(name).getId(),recordTime);
                             }
                             // a existing app
@@ -230,7 +234,7 @@ public class NodesListener {
                                 if (newApp.getState().equals("FINISHED")) {
                                     writeAppMetrics(add, newApp, newApp.getId(), recordTime);
                                     finishedApps.add(newApp.getId());
-                                    System.out.println(finishedApps);
+//                                    System.out.println(finishedApps);
                                 }
                                 else {
                                 //compare running app here
@@ -245,7 +249,7 @@ public class NodesListener {
                 for(String add: nodesContainersListTemp.keySet()) {
                     if(!nodesContainersList.containsKey(add)) {
                         //find a new node running containers, output everything
-                        System.out.println("get a new node! Output all containers.");
+//                        System.out.println("get a new node! Output all containers.");
                         for (Containers.container container: nodesContainersListTemp.get(add).values()) {
                             writeContainerMetrics(add, container, container.getId(), recordTime);
                         }
@@ -258,7 +262,7 @@ public class NodesListener {
                         for(String name: newMap.keySet()){
                             if(!oldMap.containsKey(name)) {
                                 //output, find a new container
-                                System.out.println("get a new container! Output the container.");
+//                                System.out.println("get a new container! Output the container.");
                                     writeContainerMetrics(add, newMap.get(name), name, recordTime);
                             }
                             else {
@@ -323,23 +327,26 @@ public class NodesListener {
             String[] newCon = newApp.getContainerids();
             //do not have any containers
             if (oldCon == null && newCon == null) {
-                System.out.println("nothing here!");
+//                System.out.println("nothing here!");
                 return;
             }
             //assigned new containers
             else if (oldCon == null || oldCon.length == 0) {
                 for (String containerId: newCon) {
-                    System.out.println("new containers here!");
+//                    System.out.println("new containers here!");
                    
                     NodesMetricsWriter.writeNodesAppsTable(nodeAddress, newApp.getId(), "containerId", recordTime, containerId);
                 }
+            }
+            else if (newCon == null) {
+                return;
             }
             else {
                 //num of containers changed
                 if (oldCon.length != newCon.length) {
                     for (String containerId: newCon) {
-                        System.out.println("new containers here!");
-                        System.out.println(containerId);
+//                        System.out.println("new containers here!");
+//                        System.out.println(containerId);
                         NodesMetricsWriter.writeNodesAppsTable(nodeAddress, newApp.getId(), "containerId", recordTime, containerId);
                     } 
                 }
@@ -353,8 +360,8 @@ public class NodesListener {
                             }
                         }
                         if (i == oldCon.length) {
-                            System.out.println("containers changed here!");
-//                            NodesMetricsWriter.writeNodesAppsTable(nodeAddress, newApp.getId(), "containerId", recordTime, newContainerId); 
+//                            System.out.println("containers changed here!");
+                            NodesMetricsWriter.writeNodesAppsTable(nodeAddress, newApp.getId(), "containerId", recordTime, newContainerId); 
                         }
                     }
                 }

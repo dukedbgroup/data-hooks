@@ -119,8 +119,6 @@ public class ApplicationListener {
                     return;
                 } catch (Exception e) {
                     e.printStackTrace();
-                    System.out.println("Application Listenner stopped with exception.");
-                    return;
                     // do nothing if appsResponse is empty
                 }
             }
